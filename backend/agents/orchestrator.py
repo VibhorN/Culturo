@@ -66,14 +66,59 @@ class OrchestratorAgent(BaseAgent):
             User Language: {language}
             Context: {json.dumps(context)}
             
+            CONVERSATION CONTEXT:
+            - Last country discussed: {context.get('last_country', 'None')}
+            - Recent conversation history: {context.get('conversation_history', [])}
+            
+            IMPORTANT: If the user asks a follow-up question without specifying a country (like "what are some current events"), 
+            and there was a previous country discussed, assume they want information about that same country.
+            
+            CRITICAL: For vague queries like "tell me about Japan", "what about Japan", "Japan info", "what can you say about Japan", you MUST set needs_clarification: true and ask what specific aspect they want to know about. DO NOT retrieve data for vague queries.
+            
+            Examples of VAGUE queries that need clarification:
+            - "tell me about Japan" → needs_clarification: true
+            - "what can you say about Japan" → needs_clarification: true
+            - "Japan info" → needs_clarification: true
+            - "what about Japan" → needs_clarification: true
+            
+            Examples of SPECIFIC queries that can proceed:
+            - "places to eat in Japan" → use restaurants API
+            - "song recommendations for Japan" → use music API  
+            - "news about Japan" → use news API
+            - "historical sites in Japan" → use landmarks API
+            
+            Available data sources and their purposes:
+            - news: Current cultural news and events
+            - music: Song recommendations and playlists
+            - landmarks: Historical sites and monuments
+            - restaurants: Places to eat and food recommendations
+            - destinations: Tourist attractions and places to visit
+            - food: Traditional cuisine and dishes
+            - movies: Film recommendations
+            - government: Political and administrative information
+            - festivals: Cultural celebrations and events
+            
+            Available agents:
+            - language_correction: For correcting language mistakes
+            - cultural_context: For providing cultural context and information
+            - translation: For translating text
+            - data_retrieval: For retrieving data from external APIs (use this when data sources are needed)
+            - conversation: For generating natural responses
+            - evaluation: For analyzing learning progress
+            - personalization: For personalizing responses
+            
             Determine:
-            1. What is the user's intent? (learn_language, cultural_info, pronunciation_help, travel_advice, etc.)
-            2. What country/culture are they interested in?
-            3. Which data sources should be queried? 
-               Available sources: news, music, landmarks, restaurants, destinations, food, movies, government, festivals
-            4. Which agents should be activated? (language_correction, cultural_context, translation, etc.)
-            5. Does this require real-time voice processing?
-            6. Confidence level (0-1)
+            1. Is the query specific enough to proceed, or should we ask clarifying questions?
+               - VAGUE queries like "tell me about [country]", "what about [country]", "[country] info", "what can you say about [country]" MUST ask for clarification
+               - SPECIFIC queries like "places to eat in [country]", "song recommendations for [country]", "news about [country]" can proceed
+            2. What is the user's intent? (learn_language, cultural_info, pronunciation_help, travel_advice, etc.)
+            3. What country/culture are they interested in?
+            4. Which specific data sources should be queried based on their intent?
+            5. Which agents should be activated? (ALWAYS include 'data_retrieval' if any data sources are needed)
+            6. Does this require real-time voice processing?
+            7. Confidence level (0-1)
+            
+            CRITICAL: If the query is vague or general, you MUST set "needs_clarification": true and provide a clarifying question. DO NOT proceed with data retrieval for vague queries.
             
             Respond in JSON format:
             {{
@@ -83,8 +128,12 @@ class OrchestratorAgent(BaseAgent):
                 "agents_to_activate": ["agent1", "agent2"],
                 "requires_voice": true/false,
                 "confidence": 0.9,
-                "reasoning": "explanation"
+                "reasoning": "explanation",
+                "needs_clarification": false,
+                "clarifying_question": "What specific aspect would you like to know about?"
             }}
+            
+            IMPORTANT: For vague queries, set needs_clarification: true and data_sources: [], agents_to_activate: ["conversation"]
             """
             
             headers = {

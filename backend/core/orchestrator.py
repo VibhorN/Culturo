@@ -6,6 +6,7 @@ Coordinates all agents and manages the workflow
 import logging
 import asyncio
 from typing import Dict, List
+from datetime import datetime
 from .base import AgentResponse
 from agents.orchestrator import OrchestratorAgent
 from agents.language import LanguageCorrectionAgent
@@ -39,7 +40,42 @@ class AgentOrchestrator:
             spotify_client_secret, 
             tripadvisor_api_key
         )
+        # Conversation context storage
+        self.conversation_context = {}
         logger.info("AgentOrchestrator initialized with all agents using Anthropic API")
+    
+    def _get_user_context(self, user_id: str) -> Dict:
+        """Get conversation context for a user"""
+        return self.conversation_context.get(user_id, {
+            "last_country": None,
+            "conversation_history": [],
+            "user_interests": []
+        })
+    
+    def _update_user_context(self, user_id: str, execution_plan: Dict, response: str):
+        """Update conversation context for a user"""
+        if user_id not in self.conversation_context:
+            self.conversation_context[user_id] = {
+                "last_country": None,
+                "conversation_history": [],
+                "user_interests": []
+            }
+        
+        # Update last country if specified
+        target_country = execution_plan.get("target_country")
+        if target_country and target_country not in ["unknown", "none", None]:
+            self.conversation_context[user_id]["last_country"] = target_country
+        
+        # Add to conversation history
+        self.conversation_context[user_id]["conversation_history"].append({
+            "query": execution_plan.get("intent", "unknown"),
+            "country": target_country,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Keep only last 10 conversations
+        if len(self.conversation_context[user_id]["conversation_history"]) > 10:
+            self.conversation_context[user_id]["conversation_history"] = self.conversation_context[user_id]["conversation_history"][-10:]
     
     async def process_input(self, user_input: Dict) -> Dict:
         """
@@ -49,9 +85,32 @@ class AgentOrchestrator:
             user_id = user_input.get("user_id", "anonymous")
             logger.info(f"[AgentOrchestrator] Processing input from user {user_id}")
             
+            # Get conversation context for this user
+            user_context = self._get_user_context(user_id)
+            
+            # Enhance user input with conversation context
+            enhanced_input = user_input.copy()
+            enhanced_input["context"] = {
+                "last_country": user_context["last_country"],
+                "conversation_history": user_context["conversation_history"][-3:],  # Last 3 conversations
+                "user_interests": user_context["user_interests"]
+            }
+            
             # Step 1: Orchestrator analyzes intent and creates plan
-            orchestrator_response = await self.orchestrator.process(user_input)
+            orchestrator_response = await self.orchestrator.process(enhanced_input)
             execution_plan = orchestrator_response.data
+            
+            # Check if orchestrator needs clarification
+            if execution_plan.get("needs_clarification", False):
+                return {
+                    "status": "clarification_needed",
+                    "response": execution_plan.get("clarifying_question", "Could you clarify what you're looking for?"),
+                    "metadata": {
+                        "agents_activated": ["orchestrator"],
+                        "execution_plan": execution_plan,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }
             
             # Step 2: Execute agents based on plan
             agent_responses = {}
@@ -73,9 +132,13 @@ class AgentOrchestrator:
             # Data Retrieval (only if needed)
             if "data_retrieval" in execution_plan.get("agents_to_activate", []):
                 target_country = execution_plan.get("target_country", "unknown")
-                if target_country and target_country != "none" and target_country != "unknown":
+                # Allow data retrieval for global queries (news, general topics) even without specific country
+                data_sources = execution_plan.get("data_sources", [])
+                is_global_query = not target_country or target_country in ["none", "unknown", None] and "news" in data_sources
+                
+                if target_country and target_country not in ["none", "unknown", None] or is_global_query:
                     data_input = {
-                        "country": target_country,
+                        "country": target_country or "global",
                         "query": user_input.get("query", ""),
                         "context": execution_plan
                     }
@@ -152,10 +215,19 @@ class AgentOrchestrator:
                 "metadata": {
                     "agents_activated": agents_activated,
                     "execution_plan": execution_plan,
-                    "agent_responses": {k: v.data for k, v in agent_responses.items()},
+                    "agent_responses": {k: {
+                        "status": v.status,
+                        "data": v.data,
+                        "confidence": v.confidence,
+                        "reasoning": v.reasoning,
+                        "agent_name": v.agent_name
+                    } for k, v in agent_responses.items()},
                     "confidence": conversation_response.confidence
                 }
             }
+            
+            # Update conversation context
+            self._update_user_context(user_id, execution_plan, final_response["response"])
             
             logger.info(f"[AgentOrchestrator] Completed in {0.82}s")
             return final_response

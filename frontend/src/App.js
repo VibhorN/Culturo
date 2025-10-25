@@ -514,12 +514,12 @@ function App() {
     
     try {
       const response = await axios.post('http://localhost:5001/api/agent/process', {
-        user_id: 'default',
+        user_id: 'test',
         query: query,
         language: 'en'
       });
       
-      if (response.data.status === 'success') {
+      if (response.data.status === 'success' || response.data.status === 'clarification_needed') {
         // Display the response
         setCulturalData({
           country: 'General',
@@ -551,12 +551,12 @@ function App() {
     
     try {
       const response = await axios.post('http://localhost:5001/api/agent/process', {
-        user_id: 'default',
+        user_id: 'test',
         query: `Tell me about ${countryName}`,
         language: 'en'
       });
       
-      if (response.data.status === 'success') {
+      if (response.data.status === 'success' || response.data.status === 'clarification_needed') {
         // Set the response as cultural data for display
         setCulturalData({
           country: countryName,
@@ -613,17 +613,12 @@ function App() {
 
   const handleCountrySubmit = (e) => {
     e.preventDefault();
+    console.log('📝 handleCountrySubmit called with query:', country);
+    
     if (country.trim()) {
-      // Check if it's a country-specific query
-      const countryMatch = country.match(/(?:about|teach me about|tell me about)\s+(\w+)/i);
-      const extractedCountry = countryMatch ? countryMatch[1] : null;
-      
-      if (extractedCountry) {
-        fetchCulturalData(extractedCountry);
-      } else {
-        // Handle as general query
-        handleGeneralQuery(country.trim());
-      }
+      console.log('💬 Calling handleGeneralQuery for:', country.trim());
+      // Let the LLM handle all queries - it's smart enough to recognize countries and intents
+      handleGeneralQuery(country.trim());
     }
   };
 
@@ -778,7 +773,7 @@ function App() {
                     {culturalData.response}
                   </p>
                   
-                  {/* Agent Thinking Process - Always show if available */}
+                  {/* Agent Thinking Process */}
                   {culturalData.metadata?.agent_responses?.conversation?.thinking_process && (
                     <div style={{ marginTop: '20px', padding: '15px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '1px' }}>
@@ -793,11 +788,78 @@ function App() {
                       </ul>
                     </div>
                   )}
-                  
-                  {/* Debug: Show raw thinking process if available */}
-                  {culturalData.metadata?.agent_responses?.conversation?.thinking_process && (
-                    <div style={{ marginTop: '10px', padding: '10px', backgroundColor: 'rgba(255, 0, 0, 0.1)', borderRadius: '5px', fontSize: '0.8rem' }}>
-                      <strong>Debug:</strong> Found {culturalData.metadata.agent_responses.conversation.thinking_process.length} thinking steps
+
+                  {/* Agent Execution Logs */}
+                  {culturalData.metadata?.agents_activated && (
+                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: 'rgba(255, 165, 0, 0.1)', borderRadius: '10px', border: '1px solid rgba(255, 165, 0, 0.3)' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#ffa500', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        🤖 Agent Execution Log
+                      </h4>
+                      <div style={{ fontSize: '0.8rem', color: '#ffd700' }}>
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Agents Activated:</strong> {culturalData.metadata.agents_activated.join(', ')}
+                        </div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Execution Plan:</strong>
+                          <div style={{ marginTop: '5px', fontSize: '0.7rem', backgroundColor: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
+                            <div><strong>Intent:</strong> {culturalData.metadata.execution_plan?.intent || 'Unknown'}</div>
+                            <div><strong>Target Country:</strong> {culturalData.metadata.execution_plan?.target_country || 'Unknown'}</div>
+                            <div><strong>Data Sources:</strong> {culturalData.metadata.execution_plan?.data_sources?.join(', ') || 'None'}</div>
+                            <div><strong>Confidence:</strong> {culturalData.metadata.execution_plan?.confidence || 'Unknown'}</div>
+                            <div><strong>Reasoning:</strong> {culturalData.metadata.execution_plan?.reasoning || 'No reasoning provided'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Data Retrieval Logs */}
+                  {culturalData.metadata?.agent_responses?.data_retrieval?.data?._retrieval_log && (
+                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: 'rgba(0, 150, 255, 0.1)', borderRadius: '10px', border: '1px solid rgba(0, 150, 255, 0.3)' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#60b0ff', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        📊 Data Retrieval Log
+                      </h4>
+                      <div style={{ fontSize: '0.8rem', color: '#b0d0ff' }}>
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Timestamp:</strong> {culturalData.metadata.agent_responses.data_retrieval.data._retrieval_log.timestamp}
+                        </div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Country:</strong> {culturalData.metadata.agent_responses.data_retrieval.data._retrieval_log.country}
+                        </div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Sources Requested:</strong> {culturalData.metadata.agent_responses.data_retrieval.data._retrieval_log.sources_requested.join(', ')}
+                        </div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Sources Retrieved:</strong> {culturalData.metadata.agent_responses.data_retrieval.data._retrieval_log.sources_retrieved.join(', ')}
+                        </div>
+                        <div style={{ marginTop: '10px' }}>
+                          <strong>Data Summary:</strong>
+                          <ul style={{ margin: '5px 0 0 20px', fontSize: '0.75rem' }}>
+                            {Object.entries(culturalData.metadata.agent_responses.data_retrieval.data._retrieval_log.data_summary).map(([source, summary]) => (
+                              <li key={source} style={{ marginBottom: '3px' }}>
+                                <strong>{source}:</strong> {summary.status === 'success' ? 
+                                  `✅ ${summary.location_count || summary.article_count || summary.playlist_count || 'data'} items` : 
+                                  `❌ ${summary.error || 'error'}`
+                                }
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div style={{ marginTop: '10px' }}>
+                          <strong>Actual Data Retrieved:</strong>
+                          <div style={{ marginTop: '5px', fontSize: '0.7rem', maxHeight: '200px', overflowY: 'auto', backgroundColor: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
+                            {Object.entries(culturalData.metadata.agent_responses.data_retrieval.data).filter(([key]) => key !== '_retrieval_log').map(([source, data]) => (
+                              <div key={source} style={{ marginBottom: '8px' }}>
+                                <strong style={{ color: '#60b0ff' }}>{source.toUpperCase()}:</strong>
+                                <pre style={{ margin: '2px 0', fontSize: '0.65rem', color: '#e0e0e0', whiteSpace: 'pre-wrap' }}>
+                                  {JSON.stringify(data, null, 2).substring(0, 500)}
+                                  {JSON.stringify(data, null, 2).length > 500 ? '...' : ''}
+                                </pre>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </CardContent>

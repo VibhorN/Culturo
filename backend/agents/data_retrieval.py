@@ -7,6 +7,7 @@ import json
 import logging
 import aiohttp
 import time
+from datetime import datetime
 from typing import Dict, List, Optional
 from core.base import BaseAgent, AgentResponse
 
@@ -65,12 +66,15 @@ class DataRetrievalAgent(BaseAgent):
             context = input_data.get("context", {})
             
             logger.info(f"[DataRetrieval] Processing query for {country}: {query}")
+            logger.info(f"[DataRetrieval] Input data: {input_data}")
             
             # Step 1: Analyze what data the user wants
             data_analysis = await self._analyze_data_needs(query, country, context)
+            logger.info(f"[DataRetrieval] Data analysis result: {data_analysis}")
             
             # Step 2: Check if we need clarification
             if data_analysis.get("needs_clarification", False):
+                logger.info(f"[DataRetrieval] Clarification needed")
                 return AgentResponse(
                     agent_name=self.name,
                     status="clarification_needed",
@@ -83,15 +87,19 @@ class DataRetrievalAgent(BaseAgent):
                 )
             
             # Step 3: Retrieve the requested data
+            logger.info(f"[DataRetrieval] Starting data retrieval")
             retrieved_data = await self._retrieve_data(data_analysis, country)
+            logger.info(f"[DataRetrieval] Retrieved data keys: {list(retrieved_data.keys())}")
             
-            return AgentResponse(
+            response = AgentResponse(
                 agent_name=self.name,
                 status="success",
                 data=retrieved_data,
                 confidence=data_analysis.get("confidence", 0.8),
                 reasoning=data_analysis.get("reasoning", "")
             )
+            logger.info(f"[DataRetrieval] Returning response with status: {response.status}")
+            return response
             
         except Exception as e:
             logger.error(f"[DataRetrieval] Error: {str(e)}")
@@ -208,22 +216,81 @@ class DataRetrievalAgent(BaseAgent):
     
     async def _retrieve_data(self, analysis: Dict, country: str) -> Dict:
         """Retrieve data from the specified sources"""
+        from datetime import datetime
+        
         retrieved_data = {}
         data_sources = analysis.get("data_sources_needed", [])
+        retrieval_log = {
+            "timestamp": datetime.now().isoformat(),
+            "country": country,
+            "sources_requested": data_sources,
+            "sources_retrieved": [],
+            "data_summary": {}
+        }
+        
+        logger.info(f"[DataRetrieval] Starting data retrieval for {country} at {retrieval_log['timestamp']}")
+        logger.info(f"[DataRetrieval] Requested sources: {data_sources}")
         
         for source in data_sources:
             if source in self.available_apis:
                 try:
+                    start_time = time.time()
                     data = await self.available_apis[source](country)
+                    execution_time = time.time() - start_time
+                    
                     retrieved_data[source] = data
-                    logger.info(f"[DataRetrieval] Retrieved {source} data for {country}")
+                    retrieval_log["sources_retrieved"].append(source)
+                    
+                    # Log detailed data summary
+                    data_summary = self._summarize_data(source, data)
+                    retrieval_log["data_summary"][source] = data_summary
+                    
+                    logger.info(f"[DataRetrieval] ✅ Retrieved {source} data for {country} in {execution_time:.2f}s")
+                    logger.info(f"[DataRetrieval] 📊 {source} summary: {data_summary}")
+                    
                 except Exception as e:
-                    logger.error(f"[DataRetrieval] Error retrieving {source} data: {str(e)}")
+                    logger.error(f"[DataRetrieval] ❌ Error retrieving {source} data: {str(e)}")
                     retrieved_data[source] = {"error": str(e)}
+                    retrieval_log["data_summary"][source] = {"error": str(e), "timestamp": datetime.now().isoformat()}
             else:
-                logger.warning(f"[DataRetrieval] Unknown data source: {source}")
+                logger.warning(f"[DataRetrieval] ⚠️ Unknown data source: {source}")
+        
+        # Add retrieval log to the response
+        retrieved_data["_retrieval_log"] = retrieval_log
+        logger.info(f"[DataRetrieval] 🎯 Completed retrieval: {len(retrieval_log['sources_retrieved'])}/{len(data_sources)} sources successful")
         
         return retrieved_data
+    
+    def _summarize_data(self, source: str, data: Dict) -> Dict:
+        """Create a summary of retrieved data for logging"""
+        summary = {
+            "source": source,
+            "timestamp": datetime.now().isoformat(),
+            "data_type": type(data).__name__,
+            "size": len(str(data)) if data else 0
+        }
+        
+        if isinstance(data, dict):
+            if "error" in data:
+                summary["status"] = "error"
+                summary["error"] = data["error"]
+            elif source == "news" and "articles" in data:
+                summary["status"] = "success"
+                summary["article_count"] = len(data.get("articles", []))
+                summary["total_results"] = data.get("total_results", 0)
+            elif source == "music" and "playlists" in data:
+                summary["status"] = "success"
+                summary["playlist_count"] = len(data.get("playlists", []))
+            elif source in ["landmarks", "restaurants", "destinations"] and "locations" in data:
+                summary["status"] = "success"
+                summary["location_count"] = len(data.get("locations", []))
+            else:
+                summary["status"] = "success"
+                summary["keys"] = list(data.keys()) if data else []
+        else:
+            summary["status"] = "unknown"
+            
+        return summary
     
     async def _get_news_data(self, country: str) -> Dict:
         """Get news data for the country using NewsAPI"""
