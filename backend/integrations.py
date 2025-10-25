@@ -409,3 +409,83 @@ class ClaudeIntegration:
         except Exception as e:
             logger.error(f"Error in Claude synthesis: {str(e)}")
             return None
+        
+class TripAdvisorIntegration:
+    
+    def __init__(self, api_key: str):
+        
+        self.api_key = api_key
+        self.base_url = "https://api.content.tripadvisor.com/api/v1/location/search"  
+        
+        self.country_coordinate_mappings = {
+            "France": 
+                {"latLong": "48.8566,2.3522", 
+                "radius": "5", 
+                "radiusUnit": "m"},  
+            "Spain": 
+                {"latLong": "40.4168,-3.7038", 
+                "radius": "2", 
+                "radiusUnit": "m"}, 
+            "Japan": {"latLong": "35.6895,139.6917", 
+                "radius": "5", 
+                "radiusUnit": "m"} 
+        }
+
+    def get_popular_locations(self, country: str, category: str, searchQuery: str, limit: int = 10):
+        
+        if not country in self.country_coordinate_mappings or category not in ["restaurants", "hotels", "attractions"]:
+            return None
+        location_params = self.country_coordinate_mappings[country]
+
+        headers = {
+            "Accept": "application/json"
+        }
+        
+        params = {
+            "key": self.api_key,
+            "searchQuery": searchQuery,
+            "category": category,
+            **location_params
+        }
+
+        locations = self.retriveLocationIds(headers, params)
+        
+    def retriveLocationIds(self, headers, params):
+        
+        try:
+            response = requests.get(self.base_url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            return {place['name']: place['location_id'] for place in data.get("data", [])}
+        
+        except requests.exceptions.RequestException as e:
+            return None
+        
+    def getLocationDetails(self, locations: dict):
+        return
+            
+    
+class MovieIntegration:
+    
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "https://api.tripadvisor.com/api/partner/2.0"   
+        
+    def get_top_attractions(self, location, limit=5):
+        return
+
+    
+class HistoryIntegration:
+    
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "https://api.tripadvisor.com/api/partner/2.0"   
+        
+    def get_top_attractions(self, location, limit=5):
+        return
+    
+    
+    
+
+        
+    
