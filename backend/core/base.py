@@ -13,13 +13,11 @@ logger = logging.getLogger(__name__)
 
 # Import logging system
 try:
-    from logging_system import log_agent_reasoning, log_performance
+    from utils.logging import AgentLogger
+    agent_logger = AgentLogger()
 except ImportError:
     # Fallback if logging system not available
-    def log_agent_reasoning(*args, **kwargs):
-        pass
-    def log_performance(*args, **kwargs):
-        pass
+    agent_logger = None
 
 
 @dataclass
@@ -62,26 +60,27 @@ class BaseAgent:
             
             # Log the reasoning
             execution_time = time.time() - start_time
-            log_agent_reasoning(
-                agent_name=self.name,
-                operation="process",
-                input_data=input_data,
-                output_data=result.data if hasattr(result, 'data') else {},
-                reasoning=result.reasoning if hasattr(result, 'reasoning') else "",
-                confidence=result.confidence if hasattr(result, 'confidence') else 0.0,
-                execution_time=execution_time
-            )
-            
-            # Log performance
-            log_performance(
-                operation=f"{self.name}_process",
-                duration=execution_time,
-                metadata={
-                    "agent_name": self.name,
-                    "status": result.status if hasattr(result, 'status') else "unknown",
-                    "confidence": result.confidence if hasattr(result, 'confidence') else 0.0
-                }
-            )
+            if agent_logger:
+                agent_logger.log_agent_reasoning(
+                    agent_name=self.name,
+                    operation="process",
+                    input_data=input_data,
+                    output_data=result.data if hasattr(result, 'data') else {},
+                    reasoning=result.reasoning if hasattr(result, 'reasoning') else "",
+                    confidence=result.confidence if hasattr(result, 'confidence') else 0.0,
+                    execution_time=execution_time
+                )
+                
+                # Log performance
+                agent_logger.log_performance(
+                    operation=f"{self.name}_process",
+                    duration=execution_time,
+                    metadata={
+                        "agent_name": self.name,
+                        "status": result.status if hasattr(result, 'status') else "unknown",
+                        "confidence": result.confidence if hasattr(result, 'confidence') else 0.0
+                    }
+                )
             
             return result
             
@@ -89,25 +88,26 @@ class BaseAgent:
             execution_time = time.time() - start_time
             
             # Log error
-            log_agent_reasoning(
-                agent_name=self.name,
-                operation="process_error",
-                input_data=input_data,
-                output_data={"error": str(e)},
-                reasoning=f"Error occurred: {str(e)}",
-                confidence=0.0,
-                execution_time=execution_time
-            )
-            
-            # Log performance for error case
-            log_performance(
-                operation=f"{self.name}_process_error",
-                duration=execution_time,
-                metadata={
-                    "agent_name": self.name,
-                    "error": str(e)
-                }
-            )
+            if agent_logger:
+                agent_logger.log_agent_reasoning(
+                    agent_name=self.name,
+                    operation="process_error",
+                    input_data=input_data,
+                    output_data={"error": str(e)},
+                    reasoning=f"Error occurred: {str(e)}",
+                    confidence=0.0,
+                    execution_time=execution_time
+                )
+                
+                # Log performance for error case
+                agent_logger.log_performance(
+                    operation=f"{self.name}_process_error",
+                    duration=execution_time,
+                    metadata={
+                        "agent_name": self.name,
+                        "error": str(e)
+                    }
+                )
             
             raise
     
