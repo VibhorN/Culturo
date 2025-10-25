@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/Users/tarunshah/Desktop/Venv VS/CalHacks 2025/lingua-backend/.venv/bin/python3.12" "$0" "$@"
+'''exec' "/Users/tarunshah/Desktop/Venv VS/Cal Hacks 2025/backend/.venv/bin/python3.12" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re
