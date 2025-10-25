@@ -3,7 +3,35 @@ Agent System for WorldWise
 Import all agents from the agents module
 """
 
-from core.orchestrator import AgentOrchestrator
+# Export individual agents for easy importing
+from .orchestrator import OrchestratorAgent
+from .language import LanguageCorrectionAgent
+from .cultural import CulturalContextAgent
+from .translation import TranslationAgent
+from .conversation import ConversationAgent
+from .evaluation import EvaluationAgent
+from .personalization import PersonalizationAgent
+from .data_retrieval import DataRetrievalAgent
 
-# Export the main orchestrator for easy importing
-__all__ = ['AgentOrchestrator']
+# New agents
+from .learning.pronunciation_coach import PronunciationCoachAgent
+from .learning.vocabulary_builder import VocabularyBuilderAgent
+from .cultural_agents.cultural_etiquette import CulturalEtiquetteAgent
+from .analysis.progress_analytics import ProgressAnalyticsAgent
+from .cognitive.motivation_coach import MotivationCoachAgent
+
+__all__ = [
+    'OrchestratorAgent',
+    'LanguageCorrectionAgent', 
+    'CulturalContextAgent',
+    'TranslationAgent',
+    'ConversationAgent',
+    'EvaluationAgent',
+    'PersonalizationAgent',
+    'DataRetrievalAgent',
+    'PronunciationCoachAgent',
+    'VocabularyBuilderAgent',
+    'CulturalEtiquetteAgent',
+    'ProgressAnalyticsAgent',
+    'MotivationCoachAgent'
+]

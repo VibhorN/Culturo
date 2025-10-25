@@ -106,6 +106,11 @@ class OrchestratorAgent(BaseAgent):
             - conversation: For generating natural responses
             - evaluation: For analyzing learning progress
             - personalization: For personalizing responses
+            - pronunciation_coach: For pronunciation analysis and coaching (use when audio/text input for pronunciation)
+            - vocabulary_builder: For vocabulary learning and spaced repetition (use for language learning)
+            - cultural_etiquette: For cultural etiquette guidance (use for cultural/travel advice)
+            - progress_analytics: For learning progress analysis (always include for learning insights)
+            - motivation_coach: For motivation and engagement (always include for user engagement)
             
             Determine:
             1. Is the query specific enough to proceed, or should we ask clarifying questions?

@@ -11,7 +11,7 @@ from integrations import (
     DeepgramIntegration, VapiIntegration, SpotifyIntegration,
     NewsAPIIntegration, RedditIntegration, AnthropicIntegration
 )
-from agents import AgentOrchestrator
+from core.orchestrator import AgentOrchestrator
 
 # Load environment variables
 load_dotenv()

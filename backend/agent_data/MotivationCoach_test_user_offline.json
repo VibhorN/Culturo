@@ -1,0 +1,17 @@
+{
+  "data": {
+    "current_streak": 0,
+    "longest_streak": 0,
+    "total_sessions": 1,
+    "achievements": [],
+    "milestones": [],
+    "motivation_level": "high",
+    "last_session_date": "2025-10-25T11:11:53.784068",
+    "personal_records": {},
+    "challenges_completed": 0,
+    "encouragement_history": []
+  },
+  "last_updated": "2025-10-25T11:11:53.784098",
+  "agent_name": "MotivationCoach",
+  "user_id": "test_user_offline"
+}

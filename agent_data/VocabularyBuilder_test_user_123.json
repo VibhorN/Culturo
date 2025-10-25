@@ -1,0 +1,29 @@
+{
+  "data": {
+    "known_words": {
+      "hello": {
+        "mastery": 0.9
+      },
+      "goodbye": {
+        "mastery": 0.8
+      }
+    },
+    "learning_words": {
+      "thank_you": {
+        "repetition_count": 3
+      }
+    },
+    "mastered_words": {
+      "yes": {
+        "mastered_date": "2024-01-10"
+      }
+    },
+    "statistics": {
+      "total_words_learned": 150,
+      "current_streak": 5
+    }
+  },
+  "last_updated": "2025-10-25T06:37:27.662147",
+  "agent_name": "VocabularyBuilder",
+  "user_id": "test_user_123"
+}

@@ -16,6 +16,12 @@ from agents.conversation import ConversationAgent
 from agents.evaluation import EvaluationAgent
 from agents.personalization import PersonalizationAgent
 from agents.data_retrieval import DataRetrievalAgent
+# New agents
+from agents.learning.pronunciation_coach import PronunciationCoachAgent
+from agents.learning.vocabulary_builder import VocabularyBuilderAgent
+from agents.cultural_agents.cultural_etiquette import CulturalEtiquetteAgent
+from agents.analysis.progress_analytics import ProgressAnalyticsAgent
+from agents.cognitive.motivation_coach import MotivationCoachAgent
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +31,7 @@ class AgentOrchestrator:
     Main orchestrator that coordinates all agents
     """
     
-    def __init__(self, anthropic_api_key: str, news_api_key: str = None, spotify_client_id: str = None, spotify_client_secret: str = None, tripadvisor_api_key: str = None):
+    def __init__(self, anthropic_api_key: str, news_api_key: str = None, spotify_client_id: str = None, spotify_client_secret: str = None, tripadvisor_api_key: str = None, deepgram_api_key: str = None):
         self.orchestrator = OrchestratorAgent(anthropic_api_key)
         self.language_correction = LanguageCorrectionAgent(anthropic_api_key)
         self.cultural_context = CulturalContextAgent(anthropic_api_key)
@@ -40,9 +46,15 @@ class AgentOrchestrator:
             spotify_client_secret, 
             tripadvisor_api_key
         )
+        # New agents
+        self.pronunciation_coach = PronunciationCoachAgent(anthropic_api_key, deepgram_api_key)
+        self.vocabulary_builder = VocabularyBuilderAgent(anthropic_api_key)
+        self.cultural_etiquette = CulturalEtiquetteAgent(anthropic_api_key)
+        self.progress_analytics = ProgressAnalyticsAgent(anthropic_api_key)
+        self.motivation_coach = MotivationCoachAgent(anthropic_api_key)
         # Conversation context storage
         self.conversation_context = {}
-        logger.info("AgentOrchestrator initialized with all agents using Anthropic API")
+        logger.info("AgentOrchestrator initialized with all agents including new learning agents")
     
     def _get_user_context(self, user_id: str) -> Dict:
         """Get conversation context for a user"""
@@ -207,6 +219,75 @@ class AgentOrchestrator:
             personalization_response = await self.personalization.process(personalization_input)
             agent_responses["personalization"] = personalization_response
             agents_activated.append("personalization")
+            
+            # New Learning Agents
+            
+            # Pronunciation Coach (if audio/text input)
+            if "pronunciation_coach" in execution_plan.get("agents_to_activate", []) or user_input.get("audio_data"):
+                pronunciation_input = {
+                    "user_id": user_id,
+                    "text": user_input.get("text", ""),
+                    "target_language": user_input.get("language", "en"),
+                    "audio_data": user_input.get("audio_data"),
+                    "audio_confidence": user_input.get("audio_confidence", 1.0)
+                }
+                pronunciation_response = await self.pronunciation_coach.process(pronunciation_input)
+                agent_responses["pronunciation_coach"] = pronunciation_response
+                agents_activated.append("pronunciation_coach")
+            
+            # Vocabulary Builder (if learning context)
+            if "vocabulary_builder" in execution_plan.get("agents_to_activate", []) or execution_plan.get("intent") in ["learn_language", "vocabulary_practice"]:
+                vocabulary_input = {
+                    "user_id": user_id,
+                    "action": "suggest_words",
+                    "context": execution_plan,
+                    "target_language": user_input.get("language", "en")
+                }
+                vocabulary_response = await self.vocabulary_builder.process(vocabulary_input)
+                agent_responses["vocabulary_builder"] = vocabulary_response
+                agents_activated.append("vocabulary_builder")
+            
+            # Cultural Etiquette (if cultural context)
+            if "cultural_etiquette" in execution_plan.get("agents_to_activate", []) or execution_plan.get("intent") in ["cultural_info", "travel_advice"]:
+                etiquette_input = {
+                    "user_id": user_id,
+                    "country": execution_plan.get("target_country", "unknown"),
+                    "situation": user_input.get("situation", "general"),
+                    "context_type": user_input.get("context_type", "social"),
+                    "native_culture": user_input.get("native_culture", "western")
+                }
+                etiquette_response = await self.cultural_etiquette.process(etiquette_input)
+                agent_responses["cultural_etiquette"] = etiquette_response
+                agents_activated.append("cultural_etiquette")
+            
+            # Progress Analytics (always run for learning insights)
+            analytics_input = {
+                "user_id": user_id,
+                "analysis_type": "quick",
+                "time_period": "30_days",
+                "learning_data": {
+                    "session_completed": True,
+                    "interaction_type": execution_plan.get("intent", "general"),
+                    "country": execution_plan.get("target_country", "unknown")
+                }
+            }
+            analytics_response = await self.progress_analytics.process(analytics_input)
+            agent_responses["progress_analytics"] = analytics_response
+            agents_activated.append("progress_analytics")
+            
+            # Motivation Coach (always run for engagement)
+            motivation_input = {
+                "user_id": user_id,
+                "action": "update_progress",
+                "progress_data": {
+                    "session_completed": True,
+                    "interaction_type": execution_plan.get("intent", "general"),
+                    "country": execution_plan.get("target_country", "unknown")
+                }
+            }
+            motivation_response = await self.motivation_coach.process(motivation_input)
+            agent_responses["motivation_coach"] = motivation_response
+            agents_activated.append("motivation_coach")
             
             # Compile final response
             final_response = {
