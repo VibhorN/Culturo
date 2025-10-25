@@ -409,39 +409,41 @@ class ClaudeIntegration:
         except Exception as e:
             logger.error(f"Error in Claude synthesis: {str(e)}")
             return None
-    
 
 class TripAdvisorIntegration:
+    """Async integration with TripAdvisor Content API"""
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = "https://api.content.tripadvisor.com/api/v1/location"  
+        self.base_url = "https://api.content.tripadvisor.com/api/v1/location"
         
         self.country_coordinate_mappings = {
             "France": {
-                "latLong": "48.8566,2.3522", 
-                "radius": "5", 
+                "latLong": "48.8566,2.3522",
+                "radius": "5",
                 "radiusUnit": "m"
-            },  
+            },
             "Spain": {
-                "latLong": "40.4168,-3.7038", 
-                "radius": "2", 
+                "latLong": "40.4168,-3.7038",
+                "radius": "2",
                 "radiusUnit": "m"
-            }, 
+            },
             "Japan": {
-                "latLong": "35.6895,139.6917", 
-                "radius": "5", 
+                "latLong": "35.6895,139.6917",
+                "radius": "5",
                 "radiusUnit": "m"
-            } 
+            }
         }
-        
 
-    def get_popular_locations(self, country: str, category: str, searchQuery: str, limit: int = 10):
+    async def get_popular_locations(self, country: str, category: str, searchQuery: str, limit: int = 10):
         """
         Get popular locations for a given country, category, and search term.
         Returns a list of dicts with name, description, and photo URL.
         """
-        if country not in self.country_coordinate_mappings or category not in ["restaurants", "hotels", "attractions"]:
+        if (
+            country not in self.country_coordinate_mappings
+            or category not in ["restaurants", "hotels", "attractions"]
+        ):
             return None
 
         location_params = self.country_coordinate_mappings[country]
@@ -453,93 +455,140 @@ class TripAdvisorIntegration:
             **location_params
         }
 
-        # Step 1: Get location IDs
-        locations = self.retriveLocationIds(headers, params)
+        # Step 1: Retrieve location IDs
+        locations = await self.retrieve_location_ids(headers, params)
         if not locations:
             return []
 
-        # Step 2: For each location, get details & photo
         results = []
-        for name, loc_id in list(locations.items())[:limit]:
-            description = self.getLocationDescription(loc_id, headers)
-            photo_url = self.getLocationPhoto(loc_id, headers)
-            
-            results.append({
-                "name": name,
-                "location_id": loc_id,
-                "description": description,
-                "photo": photo_url
-            })
 
-        return results
+        async with aiohttp.ClientSession() as session:
+            tasks = [
+                self.get_location_data(session, name, loc_id, headers)
+                for name, loc_id in list(locations.items())[:limit]
+            ]
+            results = await asyncio.gather(*tasks)
 
+        # Filter out None results
+        return [r for r in results if r]
 
-    def retriveLocationIds(self, headers, params):
-        """Retrieve location IDs from TripAdvisor API."""
+    async def retrieve_location_ids(self, headers, params):
+        """Retrieve location IDs from TripAdvisor API asynchronously."""
         try:
-            url = self.base_url + "/search"
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            return {place["name"]: place["location_id"] for place in data.get("data", [])}
-        
-        except requests.exceptions.RequestException:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.base_url}/search", headers=headers, params=params) as response:
+                    if response.status != 200:
+                        logger.error(f"TripAdvisor API error: {response.status}")
+                        return None
+                    data = await response.json()
+                    return {place["name"]: place["location_id"] for place in data.get("data", [])}
+        except Exception as e:
+            logger.error(f"Error retrieving location IDs: {str(e)}")
             return None
-        
 
-    def getLocationDescription(self, location_id: str, headers):
-        """Get the location’s description text."""
+    async def get_location_data(self, session, name, location_id, headers):
+        """Fetch details + photo for a single location."""
         try:
-            url = f"{self.base_url}/{location_id}/details"
-            params = {"key": self.api_key}
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json().get("data", {})
-            return data.get("description", None)
-        
-        except requests.exceptions.RequestException:
-            return None
-        
+            # Fetch details and photo concurrently
+            details_task = self.get_location_description(session, location_id, headers)
+            photo_task = self.get_location_photo(session, location_id, headers)
+            details, photo_url = await asyncio.gather(details_task, photo_task)
 
-    def getLocationPhoto(self, location_id: str, headers):
-        """Get the first available photo for a given location."""
-        try:
-            url = f"{self.base_url}/{location_id}/photos"
-            params = {"key": self.api_key, "limit": 1}
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json().get("data", [])
-            if not data:
+            if not details:
                 return None
-            # pick first image in the returned data
-            return data[0].get("images", {}).get("large", {}).get("url")
-        
-        except requests.exceptions.RequestException:
+
+            return {
+                "name": name,
+                "location_id": location_id,
+                "price_level": details.get("price_level"),
+                "website": details.get("website"),
+                "address": details.get("address_obj", {}).get("address_string"),
+                "photo": photo_url
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting location data for {name}: {str(e)}")
             return None
 
-            
-    
-class MovieIntegration:
-    
-    def __init__(self, api_key):
-        self.api_key = api_key
-        self.base_url = "https://api.tripadvisor.com/api/partner/2.0"   
-        
-    def get_top_attractions(self, location, limit=5):
-        return
+    async def get_location_description(self, session, location_id: str, headers):
+        """Async: Get the location’s description/details."""
+        try:
+            params = {"key": self.api_key}
+            async with session.get(f"{self.base_url}/{location_id}/details", headers=headers, params=params) as response:
+                if response.status != 200:
+                    return None
+                data = await response.json()
+                return data
+        except Exception as e:
+            logger.error(f"Error retrieving location description: {str(e)}")
+            return None
 
-    
-class HistoryIntegration:
-    
-    def __init__(self, api_key):
-        self.api_key = api_key
-        self.base_url = "https://api.tripadvisor.com/api/partner/2.0"   
-        
-    def get_top_attractions(self, location, limit=5):
-        return
-    
-    
-    
+    async def get_location_photo(self, session, location_id: str, headers):
+        """Async: Get the first available photo for a given location."""
+        try:
+            params = {"key": self.api_key, "limit": 1}
+            async with session.get(f"{self.base_url}/{location_id}/photos", headers=headers, params=params) as response:
+                if response.status != 200:
+                    return None
+                data = await response.json()
+                photos = data.get("data", [])
+                if not photos:
+                    return None
+                return photos[0].get("images", {}).get("large", {}).get("url")
+        except Exception as e:
+            logger.error(f"Error retrieving location photo: {str(e)}")
+            return None
 
-        
+class TMDBIntegration:
+    """Async integration with TMDb to fetch movie trailers."""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://api.themoviedb.org/3"
+
+    async def get_movie_trailer(self, movie_name: str):
+        """
+        Fetch the YouTube trailer link for a movie using TMDb.
+        Returns a YouTube URL or None if not found.
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                search_url = f"{self.base_url}/search/movie"
+                search_params = {"api_key": self.api_key, "query": movie_name}
+                
+                async with session.get(search_url, params=search_params) as search_resp:
+                    if search_resp.status != 200:
+                        logger.error(f"TMDb search error: {search_resp.status}")
+                        return None
+                    search_data = await search_resp.json()
+                
+                if not search_data.get("results"):
+                    logger.warning(f"No movie found for '{movie_name}'.")
+                    return None
+                
+                movie_id = search_data["results"][0]["id"]
+
+                videos_url = f"{self.base_url}/movie/{movie_id}/videos"
+                videos_params = {"api_key": self.api_key}
+
+                async with session.get(videos_url, params=videos_params) as videos_resp:
+                    if videos_resp.status != 200:
+                        logger.error(f"TMDb videos error: {videos_resp.status}")
+                        return None
+                    videos_data = await videos_resp.json()
+                
+                trailers = [v for v in videos_data.get("results", []) if v.get("site", "").lower() == "youtube" and v.get("type", "").lower() == "trailer"]
+
+                if trailers:
+                    trailer = trailers[0]
+                    youtube_link = f"https://www.youtube.com/watch?v={trailer['key']}"
+                    logger.info(f"🎬 Found trailer: {trailer['name']}")
+                    return youtube_link,
+
+                logger.info(f"No YouTube trailers found for '{movie_name}'.")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error fetching trailer for '{movie_name}': {str(e)}")
+            return None 
     
