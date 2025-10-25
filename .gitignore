@@ -167,4 +167,4 @@ keys/
 
 # Configuration files with sensitive data
 config.local.*
-settings.local.*
+settings.local.*backend/.venv/
