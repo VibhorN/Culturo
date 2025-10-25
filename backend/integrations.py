@@ -409,38 +409,43 @@ class ClaudeIntegration:
         except Exception as e:
             logger.error(f"Error in Claude synthesis: {str(e)}")
             return None
-        
+    
+
 class TripAdvisorIntegration:
     
     def __init__(self, api_key: str):
-        
         self.api_key = api_key
-        self.base_url = "https://api.content.tripadvisor.com/api/v1/location/search"  
+        self.base_url = "https://api.content.tripadvisor.com/api/v1/location"  
         
         self.country_coordinate_mappings = {
-            "France": 
-                {"latLong": "48.8566,2.3522", 
+            "France": {
+                "latLong": "48.8566,2.3522", 
                 "radius": "5", 
-                "radiusUnit": "m"},  
-            "Spain": 
-                {"latLong": "40.4168,-3.7038", 
+                "radiusUnit": "m"
+            },  
+            "Spain": {
+                "latLong": "40.4168,-3.7038", 
                 "radius": "2", 
-                "radiusUnit": "m"}, 
-            "Japan": {"latLong": "35.6895,139.6917", 
+                "radiusUnit": "m"
+            }, 
+            "Japan": {
+                "latLong": "35.6895,139.6917", 
                 "radius": "5", 
-                "radiusUnit": "m"} 
+                "radiusUnit": "m"
+            } 
         }
+        
 
     def get_popular_locations(self, country: str, category: str, searchQuery: str, limit: int = 10):
-        
-        if not country in self.country_coordinate_mappings or category not in ["restaurants", "hotels", "attractions"]:
+        """
+        Get popular locations for a given country, category, and search term.
+        Returns a list of dicts with name, description, and photo URL.
+        """
+        if country not in self.country_coordinate_mappings or category not in ["restaurants", "hotels", "attractions"]:
             return None
-        location_params = self.country_coordinate_mappings[country]
 
-        headers = {
-            "Accept": "application/json"
-        }
-        
+        location_params = self.country_coordinate_mappings[country]
+        headers = {"Accept": "application/json"}
         params = {
             "key": self.api_key,
             "searchQuery": searchQuery,
@@ -448,21 +453,70 @@ class TripAdvisorIntegration:
             **location_params
         }
 
+        # Step 1: Get location IDs
         locations = self.retriveLocationIds(headers, params)
-        
+        if not locations:
+            return []
+
+        # Step 2: For each location, get details & photo
+        results = []
+        for name, loc_id in list(locations.items())[:limit]:
+            description = self.getLocationDescription(loc_id, headers)
+            photo_url = self.getLocationPhoto(loc_id, headers)
+            
+            results.append({
+                "name": name,
+                "location_id": loc_id,
+                "description": description,
+                "photo": photo_url
+            })
+
+        return results
+
+
     def retriveLocationIds(self, headers, params):
-        
+        """Retrieve location IDs from TripAdvisor API."""
         try:
-            response = requests.get(self.base_url, headers=headers, params=params, timeout=10)
+            url = self.base_url + "/search"
+            response = requests.get(url, headers=headers, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            return {place['name']: place['location_id'] for place in data.get("data", [])}
+            return {place["name"]: place["location_id"] for place in data.get("data", [])}
         
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             return None
         
-    def getLocationDetails(self, locations: dict):
-        return
+
+    def getLocationDescription(self, location_id: str, headers):
+        """Get the location’s description text."""
+        try:
+            url = f"{self.base_url}/{location_id}/details"
+            params = {"key": self.api_key}
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json().get("data", {})
+            return data.get("description", None)
+        
+        except requests.exceptions.RequestException:
+            return None
+        
+
+    def getLocationPhoto(self, location_id: str, headers):
+        """Get the first available photo for a given location."""
+        try:
+            url = f"{self.base_url}/{location_id}/photos"
+            params = {"key": self.api_key, "limit": 1}
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            if not data:
+                return None
+            # pick first image in the returned data
+            return data[0].get("images", {}).get("large", {}).get("url")
+        
+        except requests.exceptions.RequestException:
+            return None
+
             
     
 class MovieIntegration:
