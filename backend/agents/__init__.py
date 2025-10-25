@@ -1,23 +1,10 @@
 """
-AI Agents for WorldWise
+Agent System for WorldWise
+Import all agents from the agents module
 """
 
-from .orchestrator import OrchestratorAgent
-from .conversation import ConversationAgent
+from core.orchestrator import AgentOrchestrator
 from .data_retrieval import DataRetrievalAgent
-from .evaluation import EvaluationAgent
-from .language import LanguageCorrectionAgent
-from .translation import TranslationAgent
-from .cultural import CulturalContextAgent
-from .personalization import PersonalizationAgent
 
-__all__ = [
-    'OrchestratorAgent',
-    'ConversationAgent', 
-    'DataRetrievalAgent',
-    'EvaluationAgent',
-    'LanguageCorrectionAgent',
-    'TranslationAgent',
-    'CulturalContextAgent',
-    'PersonalizationAgent'
-]
+# Export the main orchestrator and data retrieval agent for easy importing
+__all__ = ['AgentOrchestrator', 'DataRetrievalAgent']
