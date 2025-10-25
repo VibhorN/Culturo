@@ -14,6 +14,7 @@ from .translation import TranslationAgent
 from .conversation import ConversationAgent
 from .evaluation import EvaluationAgent
 from .personalization import PersonalizationAgent
+from .data_retrieval import DataRetrievalAgent
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class AgentOrchestrator:
         self.conversation = ConversationAgent(anthropic_api_key)
         self.evaluation = EvaluationAgent(anthropic_api_key)
         self.personalization = PersonalizationAgent()
+        self.data_retrieval = DataRetrievalAgent(anthropic_api_key)
         logger.info("AgentOrchestrator initialized with all agents using Anthropic API")
     
     async def process_input(self, user_input: Dict) -> Dict:
@@ -62,16 +64,31 @@ class AgentOrchestrator:
                     agent_responses["language_correction"] = correction_response
                     agents_activated.append("language_correction")
             
-            # Cultural Context
-            if "cultural_context" in execution_plan.get("agents_to_activate", []):
-                cultural_input = {
-                    "country": execution_plan.get("target_country", "unknown"),
-                    "intent": execution_plan.get("intent", "general"),
-                    "data_sources": execution_plan.get("data_sources", [])
-                }
-                cultural_response = await self.cultural_context.process(cultural_input)
-                agent_responses["cultural_context"] = cultural_response
-                agents_activated.append("cultural_context")
+            # Data Retrieval (only if needed)
+            if "data_retrieval" in execution_plan.get("agents_to_activate", []):
+                target_country = execution_plan.get("target_country", "unknown")
+                if target_country and target_country != "none" and target_country != "unknown":
+                    data_input = {
+                        "country": target_country,
+                        "query": user_input.get("query", ""),
+                        "context": execution_plan
+                    }
+                    data_response = await self.data_retrieval.process(data_input)
+                    
+                    # Check if clarification is needed
+                    if data_response.status == "clarification_needed":
+                        return {
+                            "status": "clarification_needed",
+                            "response": data_response.data.get("clarification_question", "Could you clarify what you're looking for?"),
+                            "metadata": {
+                                "suggested_options": data_response.data.get("suggested_options", []),
+                                "agents_activated": ["orchestrator", "data_retrieval"],
+                                "execution_plan": execution_plan
+                            }
+                        }
+                    
+                    agent_responses["data_retrieval"] = data_response
+                    agents_activated.append("data_retrieval")
             
             # Translation (if needed)
             if "translation" in execution_plan.get("agents_to_activate", []):
@@ -89,8 +106,9 @@ class AgentOrchestrator:
             conversation_input = {
                 "query": user_input.get("query", ""),
                 "context": execution_plan,
-                "cultural_data": agent_responses.get("cultural_context", AgentResponse("", "", {})).data if "cultural_context" in agent_responses else {},
-                "language_corrections": agent_responses.get("language_correction", AgentResponse("", "", {})).data if "language_correction" in agent_responses else {}
+                "retrieved_data": agent_responses.get("data_retrieval", AgentResponse("", "", {})).data if "data_retrieval" in agent_responses else {},
+                "language_corrections": agent_responses.get("language_correction", AgentResponse("", "", {})).data if "language_correction" in agent_responses else {},
+                "has_retrieved_data": "data_retrieval" in agent_responses
             }
             conversation_response = await self.conversation.process(conversation_input)
             agent_responses["conversation"] = conversation_response

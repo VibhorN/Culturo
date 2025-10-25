@@ -20,7 +20,7 @@ class PersonalizationAgent(BaseAgent):
         super().__init__("Personalization", "")
         self.user_profiles = {}
     
-    async def process(self, input_data: Dict) -> AgentResponse:
+    async def _process_impl(self, input_data: Dict) -> AgentResponse:
         """
         Updates user profile and provides personalization
         """

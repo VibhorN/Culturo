@@ -6,10 +6,18 @@ Provides cultural insights and context for different countries
 import json
 import logging
 import aiohttp
+import time
 from typing import Dict
 from .base import BaseAgent, AgentResponse
 
 logger = logging.getLogger(__name__)
+
+# Import logging system
+try:
+    from logging_system import log_api_call
+except ImportError:
+    def log_api_call(*args, **kwargs):
+        pass
 
 
 class CulturalContextAgent(BaseAgent):
@@ -20,7 +28,7 @@ class CulturalContextAgent(BaseAgent):
     def __init__(self, anthropic_api_key: str):
         super().__init__("CulturalContext", anthropic_api_key)
     
-    async def process(self, input_data: Dict) -> AgentResponse:
+    async def _process_impl(self, input_data: Dict) -> AgentResponse:
         """
         Analyzes cultural context and provides insights
         """
@@ -90,18 +98,32 @@ class CulturalContextAgent(BaseAgent):
             }
             
             data = {
-                "model": "claude-3-sonnet-20240229",
+                "model": "claude-3-haiku-20240307",
                 "max_tokens": 1000,
                 "messages": [{"role": "user", "content": prompt}]
             }
             
             async with aiohttp.ClientSession() as session:
+                start_time = time.time()
                 async with session.post(
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json=data,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
+                    execution_time = time.time() - start_time
+                    
+                    # Log API call
+                    log_api_call(
+                        service="anthropic",
+                        endpoint="/v1/messages",
+                        method="POST",
+                        request_data=data,
+                        response_data={"status": response.status, "content": "..."},
+                        status_code=response.status,
+                        execution_time=execution_time
+                    )
+                    
                     if response.status == 200:
                         result = await response.json()
                         insights_text = result["content"][0]["text"]

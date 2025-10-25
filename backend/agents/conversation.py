@@ -6,10 +6,18 @@ Generates natural, engaging responses for user interactions
 import json
 import logging
 import aiohttp
+import time
 from typing import Dict
 from .base import BaseAgent, AgentResponse
 
 logger = logging.getLogger(__name__)
+
+# Import logging system
+try:
+    from logging_system import log_api_call
+except ImportError:
+    def log_api_call(*args, **kwargs):
+        pass
 
 
 class ConversationAgent(BaseAgent):
@@ -20,14 +28,14 @@ class ConversationAgent(BaseAgent):
     def __init__(self, anthropic_api_key: str):
         super().__init__("Conversation", anthropic_api_key)
     
-    async def process(self, input_data: Dict) -> AgentResponse:
+    async def _process_impl(self, input_data: Dict) -> AgentResponse:
         """
         Generates conversational response
         """
         try:
             user_query = input_data.get("query", "")
             context = input_data.get("context", {})
-            cultural_data = input_data.get("cultural_data", {})
+            retrieved_data = input_data.get("retrieved_data", {})
             language_corrections = input_data.get("language_corrections", {})
             
             logger.info(f"[Conversation] Generating response to: '{user_query}'")
@@ -35,7 +43,7 @@ class ConversationAgent(BaseAgent):
             response = await self._generate_response(
                 user_query, 
                 context, 
-                cultural_data,
+                retrieved_data,
                 language_corrections
             )
             
@@ -56,24 +64,30 @@ class ConversationAgent(BaseAgent):
                 confidence=0.0
             )
     
-    async def _generate_response(self, query: str, context: Dict, cultural_data: Dict, corrections: Dict) -> Dict:
+    async def _generate_response(self, query: str, context: Dict, retrieved_data: Dict, corrections: Dict) -> Dict:
         """Use Claude via Anthropic API to generate conversational response"""
         try:
+            has_retrieved_data = len(retrieved_data) > 0 and retrieved_data != {}
+            
             prompt = f"""
             You are WorldWise, a friendly cultural immersion AI assistant.
             Generate a natural, engaging response to the user's query.
             
             User Query: "{query}"
             Context: {json.dumps(context)}
-            Cultural Data: {json.dumps(cultural_data)}
+            Has Retrieved Data: {has_retrieved_data}
+            Retrieved Data: {json.dumps(retrieved_data) if has_retrieved_data else "No retrieved data available"}
             Language Corrections: {json.dumps(corrections)}
             
             Guidelines:
             - Be warm, helpful, and culturally sensitive
-            - Incorporate cultural insights naturally
+            - For simple conversational queries (like "Who are you?", "What can you do?"), give a direct, friendly response about WorldWise
+            - For cultural queries, incorporate retrieved data naturally and show enthusiasm about the culture
+            - For interest statements (like "I'm interested in Japan"), respond enthusiastically and provide engaging cultural information
             - Address any language corrections gently
             - Ask follow-up questions to deepen engagement
             - Keep responses conversational, not academic
+            - If clarification is needed, ask specific questions about what they want to know
             
             Respond in JSON:
             {{
@@ -94,18 +108,32 @@ class ConversationAgent(BaseAgent):
             }
             
             data = {
-                "model": "claude-3-sonnet-20240229",
+                "model": "claude-3-haiku-20240307",
                 "max_tokens": 1000,
                 "messages": [{"role": "user", "content": prompt}]
             }
             
             async with aiohttp.ClientSession() as session:
+                start_time = time.time()
                 async with session.post(
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json=data,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
+                    execution_time = time.time() - start_time
+                    
+                    # Log API call
+                    log_api_call(
+                        service="anthropic",
+                        endpoint="/v1/messages",
+                        method="POST",
+                        request_data=data,
+                        response_data={"status": response.status, "content": "..."},
+                        status_code=response.status,
+                        execution_time=execution_time
+                    )
+                    
                     if response.status == 200:
                         result = await response.json()
                         response_text = result["content"][0]["text"]
