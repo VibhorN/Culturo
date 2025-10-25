@@ -1,6 +1,6 @@
 """
-Translation Agent
-Handles translation between languages with cultural context
+Language Correction Agent
+Analyzes user's language input for grammar mistakes, pronunciation issues, and better phrasing
 """
 
 import json
@@ -20,43 +20,46 @@ except ImportError:
         pass
 
 
-class TranslationAgent(BaseAgent):
+class LanguageCorrectionAgent(BaseAgent):
     """
-    Handles translation between languages with cultural context
+    Analyzes user's language input for:
+    - Grammar mistakes
+    - Pronunciation issues
+    - Better phrasing suggestions
     """
     
     def __init__(self, anthropic_api_key: str):
-        super().__init__("Translation", anthropic_api_key)
+        super().__init__("LanguageCorrection", anthropic_api_key)
     
     async def _process_impl(self, input_data: Dict) -> AgentResponse:
         """
-        Translates text with cultural context
+        Analyzes language input and provides corrections
         """
         try:
             text = input_data.get("text", "")
-            source_language = input_data.get("source_language", "en")
             target_language = input_data.get("target_language", "en")
-            context = input_data.get("context", {})
+            user_native_language = input_data.get("native_language", "en")
+            audio_confidence = input_data.get("audio_confidence", 1.0)
             
-            logger.info(f"[Translation] {source_language} -> {target_language}: '{text}'")
+            logger.info(f"[LanguageCorrection] Analyzing: '{text}'")
             
-            translation = await self._translate_with_context(
+            corrections = await self._analyze_language(
                 text, 
-                source_language, 
-                target_language,
-                context
+                target_language, 
+                user_native_language,
+                audio_confidence
             )
             
             return AgentResponse(
                 agent_name=self.name,
                 status="success",
-                data=translation,
-                confidence=translation.get("confidence", 0.8),
-                reasoning=translation.get("reasoning", "")
+                data=corrections,
+                confidence=corrections.get("confidence", 0.8),
+                reasoning=corrections.get("explanation", "")
             )
             
         except Exception as e:
-            logger.error(f"[Translation] Error: {str(e)}")
+            logger.error(f"[LanguageCorrection] Error: {str(e)}")
             return AgentResponse(
                 agent_name=self.name,
                 status="error",
@@ -64,36 +67,38 @@ class TranslationAgent(BaseAgent):
                 confidence=0.0
             )
     
-    async def _translate_with_context(self, text: str, source_lang: str, target_lang: str, context: Dict) -> Dict:
-        """Use Claude via Anthropic API to translate with cultural context"""
+    async def _analyze_language(self, text: str, target_lang: str, native_lang: str, audio_conf: float) -> Dict:
+        """Use Claude via Anthropic API to analyze language and provide corrections"""
         try:
             prompt = f"""
-            You are a professional translator with deep cultural knowledge.
-            Translate this text considering cultural context and nuances.
+            You are a language correction expert. Analyze this text for mistakes.
             
             Text: "{text}"
-            Source Language: {source_lang}
             Target Language: {target_lang}
-            Context: {json.dumps(context)}
+            User's Native Language: {native_lang}
+            Audio Confidence: {audio_conf} (lower means possibly misheard)
             
             Provide:
-            1. Direct translation
-            2. Cultural adaptation (if needed)
-            3. Alternative translations
-            4. Cultural notes
-            5. Confidence level
+            1. Grammar corrections (if any)
+            2. Pronunciation tips (if audio confidence is low)
+            3. Better phrasing suggestions
+            4. Cultural appropriateness
+            5. Confidence in your corrections (0-1)
             
             Respond in JSON:
             {{
-                "direct_translation": "...",
-                "cultural_adaptation": "...",
-                "alternatives": [
-                    {{"translation": "...", "context": "...", "formality": "formal/casual"}}
+                "has_errors": true/false,
+                "grammar_corrections": [
+                    {{"original": "...", "corrected": "...", "explanation": "..."}}
+                ],
+                "pronunciation_tips": ["tip1", "tip2"],
+                "better_phrases": [
+                    {{"original": "...", "improved": "...", "why": "..."}}
                 ],
                 "cultural_notes": ["note1", "note2"],
-                "pronunciation_guide": "...",
+                "overall_quality": "excellent/good/needs_work",
                 "confidence": 0.9,
-                "reasoning": "..."
+                "explanation": "..."
             }}
             """
             
@@ -132,24 +137,25 @@ class TranslationAgent(BaseAgent):
                     
                     if response.status == 200:
                         result = await response.json()
-                        translation_text = result["content"][0]["text"]
+                        corrections_text = result["content"][0]["text"]
                     else:
                         raise Exception(f"Anthropic API error: {response.status}")
             
-            start_idx = translation_text.find('{')
-            end_idx = translation_text.rfind('}') + 1
+            start_idx = corrections_text.find('{')
+            end_idx = corrections_text.rfind('}') + 1
             if start_idx != -1 and end_idx > start_idx:
-                return json.loads(translation_text[start_idx:end_idx])
+                return json.loads(corrections_text[start_idx:end_idx])
                     
         except Exception as e:
-            logger.error(f"[Translation] Error: {str(e)}")
+            logger.error(f"[LanguageCorrection] Error: {str(e)}")
         
         return {
-            "direct_translation": text,
-            "cultural_adaptation": text,
-            "alternatives": [],
+            "has_errors": False,
+            "grammar_corrections": [],
+            "pronunciation_tips": [],
+            "better_phrases": [],
             "cultural_notes": [],
-            "pronunciation_guide": "",
+            "overall_quality": "unknown",
             "confidence": 0.3,
-            "reasoning": "Unable to translate"
+            "explanation": "Unable to analyze"
         }

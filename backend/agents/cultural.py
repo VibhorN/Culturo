@@ -1,6 +1,6 @@
 """
-Translation Agent
-Handles translation between languages with cultural context
+Cultural Context Agent
+Provides cultural insights and context for different countries
 """
 
 import json
@@ -20,43 +20,37 @@ except ImportError:
         pass
 
 
-class TranslationAgent(BaseAgent):
+class CulturalContextAgent(BaseAgent):
     """
-    Handles translation between languages with cultural context
+    Provides cultural insights and context for different countries
     """
     
     def __init__(self, anthropic_api_key: str):
-        super().__init__("Translation", anthropic_api_key)
+        super().__init__("CulturalContext", anthropic_api_key)
     
     async def _process_impl(self, input_data: Dict) -> AgentResponse:
         """
-        Translates text with cultural context
+        Analyzes cultural context and provides insights
         """
         try:
-            text = input_data.get("text", "")
-            source_language = input_data.get("source_language", "en")
-            target_language = input_data.get("target_language", "en")
-            context = input_data.get("context", {})
+            country = input_data.get("country", "unknown")
+            intent = input_data.get("intent", "general")
+            data_sources = input_data.get("data_sources", [])
             
-            logger.info(f"[Translation] {source_language} -> {target_language}: '{text}'")
+            logger.info(f"[CulturalContext] Analyzing {country} - {intent}")
             
-            translation = await self._translate_with_context(
-                text, 
-                source_language, 
-                target_language,
-                context
-            )
+            insights = await self._analyze_culture(country, intent, data_sources)
             
             return AgentResponse(
                 agent_name=self.name,
                 status="success",
-                data=translation,
-                confidence=translation.get("confidence", 0.8),
-                reasoning=translation.get("reasoning", "")
+                data=insights,
+                confidence=insights.get("confidence", 0.8),
+                reasoning=insights.get("reasoning", "")
             )
             
         except Exception as e:
-            logger.error(f"[Translation] Error: {str(e)}")
+            logger.error(f"[CulturalContext] Error: {str(e)}")
             return AgentResponse(
                 agent_name=self.name,
                 status="error",
@@ -64,34 +58,34 @@ class TranslationAgent(BaseAgent):
                 confidence=0.0
             )
     
-    async def _translate_with_context(self, text: str, source_lang: str, target_lang: str, context: Dict) -> Dict:
-        """Use Claude via Anthropic API to translate with cultural context"""
+    async def _analyze_culture(self, country: str, intent: str, data_sources: list) -> Dict:
+        """Use Claude via Anthropic API to analyze cultural context"""
         try:
             prompt = f"""
-            You are a professional translator with deep cultural knowledge.
-            Translate this text considering cultural context and nuances.
+            You are a cultural expert. Provide insights about {country} based on the user's intent.
             
-            Text: "{text}"
-            Source Language: {source_lang}
-            Target Language: {target_lang}
-            Context: {json.dumps(context)}
+            Country: {country}
+            Intent: {intent}
+            Data Sources Available: {data_sources}
             
             Provide:
-            1. Direct translation
-            2. Cultural adaptation (if needed)
-            3. Alternative translations
-            4. Cultural notes
-            5. Confidence level
+            1. Key cultural insights relevant to the intent
+            2. Important customs and traditions
+            3. Language nuances and expressions
+            4. Social norms and etiquette
+            5. Common misconceptions to avoid
+            6. Practical tips for travelers/learners
             
             Respond in JSON:
             {{
-                "direct_translation": "...",
-                "cultural_adaptation": "...",
-                "alternatives": [
-                    {{"translation": "...", "context": "...", "formality": "formal/casual"}}
+                "cultural_insights": [
+                    {{"category": "...", "insight": "...", "importance": "high/medium/low"}}
                 ],
-                "cultural_notes": ["note1", "note2"],
-                "pronunciation_guide": "...",
+                "customs": ["custom1", "custom2"],
+                "language_nuances": ["nuance1", "nuance2"],
+                "etiquette": ["rule1", "rule2"],
+                "misconceptions": ["myth1", "myth2"],
+                "practical_tips": ["tip1", "tip2"],
                 "confidence": 0.9,
                 "reasoning": "..."
             }}
@@ -105,7 +99,7 @@ class TranslationAgent(BaseAgent):
             
             data = {
                 "model": "claude-3-haiku-20240307",
-                "max_tokens": 800,
+                "max_tokens": 1000,
                 "messages": [{"role": "user", "content": prompt}]
             }
             
@@ -132,24 +126,25 @@ class TranslationAgent(BaseAgent):
                     
                     if response.status == 200:
                         result = await response.json()
-                        translation_text = result["content"][0]["text"]
+                        insights_text = result["content"][0]["text"]
                     else:
                         raise Exception(f"Anthropic API error: {response.status}")
             
-            start_idx = translation_text.find('{')
-            end_idx = translation_text.rfind('}') + 1
+            start_idx = insights_text.find('{')
+            end_idx = insights_text.rfind('}') + 1
             if start_idx != -1 and end_idx > start_idx:
-                return json.loads(translation_text[start_idx:end_idx])
+                return json.loads(insights_text[start_idx:end_idx])
                     
         except Exception as e:
-            logger.error(f"[Translation] Error: {str(e)}")
+            logger.error(f"[CulturalContext] Error: {str(e)}")
         
         return {
-            "direct_translation": text,
-            "cultural_adaptation": text,
-            "alternatives": [],
-            "cultural_notes": [],
-            "pronunciation_guide": "",
+            "cultural_insights": [],
+            "customs": [],
+            "language_nuances": [],
+            "etiquette": [],
+            "misconceptions": [],
+            "practical_tips": [],
             "confidence": 0.3,
-            "reasoning": "Unable to translate"
+            "reasoning": "Unable to analyze"
         }

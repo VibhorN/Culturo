@@ -9,9 +9,9 @@ from datetime import datetime
 import logging
 from integrations import (
     DeepgramIntegration, VapiIntegration, SpotifyIntegration,
-    NewsAPIIntegration, RedditIntegration, ClaudeIntegration
+    NewsAPIIntegration, RedditIntegration, AnthropicIntegration
 )
-from agents import AgentOrchestrator
+from core import AgentOrchestrator
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +32,7 @@ SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 REDDIT_CLIENT_ID = os.getenv('REDDIT_CLIENT_ID')
 REDDIT_CLIENT_SECRET = os.getenv('REDDIT_CLIENT_SECRET')
+REDDIT_USER_AGENT = os.getenv('REDDIT_USER_AGENT')
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 LETTA_API_KEY = os.getenv('LETTA_API_KEY')
 ARIZE_API_KEY = os.getenv('ARIZE_API_KEY')
@@ -41,8 +42,8 @@ deepgram = DeepgramIntegration(DEEPGRAM_API_KEY) if DEEPGRAM_API_KEY else None
 vapi = VapiIntegration(VAPI_API_KEY) if VAPI_API_KEY else None
 spotify = SpotifyIntegration(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET) if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET else None
 news_api = NewsAPIIntegration(NEWS_API_KEY) if NEWS_API_KEY else None
-reddit = RedditIntegration(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET) if REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET else None
-claude = ClaudeIntegration(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+reddit = RedditIntegration(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT) if REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET and REDDIT_USER_AGENT else None
+claude = AnthropicIntegration(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
 # Initialize Agent Orchestrator with Anthropic API
 try:

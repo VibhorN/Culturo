@@ -1,6 +1,4 @@
-#!/bin/sh
-'''exec' "/Users/tarunshah/Desktop/Venv VS/CalHacks 2025/lingua-backend/.venv/bin/python3.12" "$0" "$@"
-' '''
+#!/Users/danchizik/Desktop/lingua-cal-hacks/backend/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

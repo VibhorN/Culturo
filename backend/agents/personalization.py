@@ -6,7 +6,7 @@ Tracks user preferences and adapts the experience
 import json
 import logging
 from typing import Dict
-from .base import BaseAgent, AgentResponse
+from core.base import BaseAgent, AgentResponse
 
 logger = logging.getLogger(__name__)
 

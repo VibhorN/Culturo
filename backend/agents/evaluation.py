@@ -8,13 +8,13 @@ import logging
 import aiohttp
 import time
 from typing import Dict
-from .base import BaseAgent, AgentResponse
+from core.base import BaseAgent, AgentResponse
 
 logger = logging.getLogger(__name__)
 
 # Import logging system
 try:
-    from logging_system import log_api_call
+    from utils.logging import log_api_call
 except ImportError:
     def log_api_call(*args, **kwargs):
         pass

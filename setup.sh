@@ -39,18 +39,18 @@ echo "🔧 Setting up backend..."
 cd backend
 
 # Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
+if [ ! -d ".venv" ]; then
     echo "Creating Python virtual environment..."
-    python3 -m venv venv
+    python3 -m venv .venv
 fi
 
 # Activate virtual environment
 echo "Activating virtual environment..."
-source venv/bin/activate
+source .venv/bin/activate
 
 # Install dependencies
 echo "Installing Python dependencies..."
-pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt
 
 # Check for .env file
 if [ ! -f ".env" ]; then
@@ -82,7 +82,7 @@ echo "1. Edit backend/.env with your API keys"
 echo "2. Run: ./start.sh"
 echo ""
 echo "Or start manually:"
-echo "  Backend:  cd backend && source venv/bin/activate && python app.py"
+echo "  Backend:  cd backend && .venv/bin/python3 app.py"
 echo "  Frontend: cd frontend && npm start"
 echo ""
 echo "🌍 Happy cultural exploring!"
