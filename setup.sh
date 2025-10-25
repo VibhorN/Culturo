@@ -70,7 +70,7 @@ cd frontend
 
 # Install dependencies
 echo "Installing Node.js dependencies..."
-npm install
+npm install --legacy-peer-deps
 
 cd ..
 

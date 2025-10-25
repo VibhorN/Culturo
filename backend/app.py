@@ -11,6 +11,7 @@ from integrations import (
     DeepgramIntegration, VapiIntegration, SpotifyIntegration,
     NewsAPIIntegration, RedditIntegration, ClaudeIntegration
 )
+from agents import AgentOrchestrator
 
 # Load environment variables
 load_dotenv()
@@ -42,6 +43,14 @@ spotify = SpotifyIntegration(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET) if SPOTIF
 news_api = NewsAPIIntegration(NEWS_API_KEY) if NEWS_API_KEY else None
 reddit = RedditIntegration(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET) if REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET else None
 claude = ClaudeIntegration(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+
+# Initialize Agent Orchestrator with Anthropic API
+try:
+    agent_orchestrator = AgentOrchestrator(ANTHROPIC_API_KEY)
+    logger.info("Agent orchestrator initialized with Anthropic API")
+except Exception as e:
+    logger.warning(f"Failed to initialize agent orchestrator: {str(e)}")
+    agent_orchestrator = None
 
 class CulturalDataAggregator:
     """Main class for aggregating cultural data from multiple APIs"""
@@ -361,13 +370,130 @@ async def claude_reasoning():
         logger.error(f"Error in Claude reasoning: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/agent/process', methods=['POST'])
+async def agent_process():
+    """
+    Main agentic workflow endpoint
+    Processes user input through multiple specialized agents
+    """
+    try:
+        if not agent_orchestrator:
+            return jsonify({"error": "Agent system not configured. Please set ANTHROPIC_API_KEY"}), 500
+        
+        data = request.get_json()
+        
+        # Extract user input
+        user_input = {
+            "user_id": data.get('user_id', 'default'),
+            "query": data.get('query', ''),
+            "text": data.get('text', ''),
+            "language": data.get('language', 'en'),
+            "audio_confidence": data.get('audio_confidence', 1.0),
+            "cultural_data": data.get('cultural_data', {}),
+            "session_data": data.get('session_data', {})
+        }
+        
+        # Process through agent workflow
+        result = await agent_orchestrator.process_input(user_input)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error in agent processing: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/agent/correct-language', methods=['POST'])
+async def agent_correct_language():
+    """
+    Language correction endpoint using the LanguageCorrectionAgent
+    """
+    try:
+        if not agent_orchestrator:
+            return jsonify({"error": "Agent system not configured"}), 500
+        
+        data = request.get_json()
+        
+        response = await agent_orchestrator.language_correction.process({
+            "text": data.get('text', ''),
+            "target_language": data.get('target_language', 'en'),
+            "native_language": data.get('native_language', 'en'),
+            "audio_confidence": data.get('audio_confidence', 1.0)
+        })
+        
+        return jsonify({
+            "status": response.status,
+            "corrections": response.data,
+            "confidence": response.confidence
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in language correction: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/agent/cultural-insights', methods=['POST'])
+async def agent_cultural_insights():
+    """
+    Get cultural insights using the CulturalContextAgent
+    """
+    try:
+        if not agent_orchestrator:
+            return jsonify({"error": "Agent system not configured"}), 500
+        
+        data = request.get_json()
+        
+        response = await agent_orchestrator.cultural_context.process({
+            "country": data.get('country', ''),
+            "topic": data.get('topic', 'general'),
+            "cultural_data": data.get('cultural_data', {}),
+            "query": data.get('query', '')
+        })
+        
+        return jsonify({
+            "status": response.status,
+            "insights": response.data,
+            "confidence": response.confidence
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting cultural insights: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/agent/translate', methods=['POST'])
+async def agent_translate():
+    """
+    Translation endpoint using the TranslationAgent
+    """
+    try:
+        if not agent_orchestrator:
+            return jsonify({"error": "Agent system not configured"}), 500
+        
+        data = request.get_json()
+        
+        response = await agent_orchestrator.translation.process({
+            "text": data.get('text', ''),
+            "source_language": data.get('source_language', 'auto'),
+            "target_language": data.get('target_language', 'en'),
+            "context": data.get('context', '')
+        })
+        
+        return jsonify({
+            "status": response.status,
+            "translation": response.data,
+            "confidence": response.confidence
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in translation: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "agents_available": agent_orchestrator is not None
     })
 
 if __name__ == '__main__':
