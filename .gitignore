@@ -168,3 +168,5 @@ keys/
 # Configuration files with sensitive data
 config.local.*
 settings.local.*backend/.venv/
+backend/.env
+backend/.env
