@@ -1,20 +1,23 @@
 """
-NewsAPI Integration
+News API Integration
+Handles news data retrieval for cultural context
 """
 
 import aiohttp
 import logging
+from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
 
 class NewsAPIIntegration:
     """Integration with NewsAPI for current news"""
     
-    def __init__(self, api_key):
+    def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://newsapi.org/v2"
     
-    async def get_cultural_news(self, country, language="en"):
+    async def get_cultural_news(self, country: str, language: str = "en") -> Optional[List[Dict]]:
         """Get cultural news for a country"""
         try:
             headers = {"X-API-Key": self.api_key}
@@ -63,31 +66,3 @@ class NewsAPIIntegration:
         except Exception as e:
             logger.error(f"Error getting cultural news: {str(e)}")
             return None
-    
-    async def get_top_headlines(self, q=None, country=None, language="en"):
-        """Get top headlines"""
-        try:
-            headers = {"X-API-Key": self.api_key}
-            params = {"language": language, "pageSize": 5}
-            
-            if q:
-                params["q"] = q
-            if country:
-                params["country"] = country
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self.base_url}/top-headlines",
-                    headers=headers,
-                    params=params
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        return result.get("articles", [])
-                    else:
-                        logger.error(f"NewsAPI error: {response.status}")
-                        return []
-                        
-        except Exception as e:
-            logger.error(f"Error getting headlines: {str(e)}")
-            return []

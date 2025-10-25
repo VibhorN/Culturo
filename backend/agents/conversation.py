@@ -6,18 +6,10 @@ Generates natural, engaging responses for user interactions
 import json
 import logging
 import aiohttp
-import time
 from typing import Dict
-from core.base import BaseAgent, AgentResponse
+from .base import BaseAgent, AgentResponse
 
 logger = logging.getLogger(__name__)
-
-# Import logging system
-try:
-    from utils.logging import log_api_call
-except ImportError:
-    def log_api_call(*args, **kwargs):
-        pass
 
 
 class ConversationAgent(BaseAgent):
@@ -28,14 +20,14 @@ class ConversationAgent(BaseAgent):
     def __init__(self, anthropic_api_key: str):
         super().__init__("Conversation", anthropic_api_key)
     
-    async def _process_impl(self, input_data: Dict) -> AgentResponse:
+    async def process(self, input_data: Dict) -> AgentResponse:
         """
         Generates conversational response
         """
         try:
             user_query = input_data.get("query", "")
             context = input_data.get("context", {})
-            retrieved_data = input_data.get("retrieved_data", {})
+            cultural_data = input_data.get("cultural_data", {})
             language_corrections = input_data.get("language_corrections", {})
             
             logger.info(f"[Conversation] Generating response to: '{user_query}'")
@@ -43,7 +35,7 @@ class ConversationAgent(BaseAgent):
             response = await self._generate_response(
                 user_query, 
                 context, 
-                retrieved_data,
+                cultural_data,
                 language_corrections
             )
             
@@ -64,40 +56,45 @@ class ConversationAgent(BaseAgent):
                 confidence=0.0
             )
     
-    async def _generate_response(self, query: str, context: Dict, retrieved_data: Dict, corrections: Dict) -> Dict:
+    async def _generate_response(self, query: str, context: Dict, cultural_data: Dict, corrections: Dict) -> Dict:
         """Use Claude via Anthropic API to generate conversational response"""
         try:
-            has_retrieved_data = len(retrieved_data) > 0 and retrieved_data != {}
-            
             prompt = f"""
             You are WorldWise, a friendly cultural immersion AI assistant.
             Generate a natural, engaging response to the user's query.
             
             User Query: "{query}"
             Context: {json.dumps(context)}
-            Has Retrieved Data: {has_retrieved_data}
-            Retrieved Data: {json.dumps(retrieved_data) if has_retrieved_data else "No retrieved data available"}
+            Cultural Data: {json.dumps(cultural_data)}
             Language Corrections: {json.dumps(corrections)}
             
             Guidelines:
             - Be warm, helpful, and culturally sensitive
+            - Keep responses SHORT and CONCISE (2-3 sentences maximum for voice)
             - For simple conversational queries (like "Who are you?", "What can you do?"), give a direct, friendly response about WorldWise
             - For cultural queries, incorporate retrieved data naturally and show enthusiasm about the culture
             - For interest statements (like "I'm interested in Japan"), respond enthusiastically and provide engaging cultural information
             - Address any language corrections gently
-            - Ask follow-up questions to deepen engagement
+            - Ask ONE follow-up question to deepen engagement
             - Keep responses conversational, not academic
             - If clarification is needed, ask specific questions about what they want to know
+            - Prioritize the most interesting cultural insights from the retrieved data
             
             Respond in JSON:
             {{
                 "response": "Your natural response here...",
-                "follow_up_questions": ["question1", "question2"],
+                "follow_up_questions": ["question1"],
                 "cultural_highlights": ["highlight1", "highlight2"],
                 "learning_tips": ["tip1", "tip2"],
                 "tone": "friendly/encouraging/curious",
                 "confidence": 0.9,
-                "reasoning": "..."
+                "reasoning": "Detailed explanation of how you processed the query, what cultural data you used, and why you chose this response approach",
+                "thinking_process": [
+                    "Step 1: Analyzed user intent",
+                    "Step 2: Identified relevant cultural data",
+                    "Step 3: Selected key insights to highlight",
+                    "Step 4: Crafted concise response"
+                ]
             }}
             """
             
@@ -114,26 +111,12 @@ class ConversationAgent(BaseAgent):
             }
             
             async with aiohttp.ClientSession() as session:
-                start_time = time.time()
                 async with session.post(
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json=data,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
-                    execution_time = time.time() - start_time
-                    
-                    # Log API call
-                    log_api_call(
-                        service="anthropic",
-                        endpoint="/v1/messages",
-                        method="POST",
-                        request_data=data,
-                        response_data={"status": response.status, "content": "..."},
-                        status_code=response.status,
-                        execution_time=execution_time
-                    )
-                    
                     if response.status == 200:
                         result = await response.json()
                         response_text = result["content"][0]["text"]
@@ -155,5 +138,11 @@ class ConversationAgent(BaseAgent):
             "learning_tips": [],
             "tone": "friendly",
             "confidence": 0.3,
-            "reasoning": "Fallback response"
+            "reasoning": "Fallback response due to API error",
+            "thinking_process": [
+                "Step 1: Detected API error in response generation",
+                "Step 2: Using fallback response to maintain conversation flow",
+                "Step 3: Asking open-ended question to engage user",
+                "Step 4: Providing helpful follow-up questions"
+            ]
         }

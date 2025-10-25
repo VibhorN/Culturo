@@ -8,6 +8,7 @@ from .vapi import VapiIntegration
 from .spotify import SpotifyIntegration
 from .news import NewsAPIIntegration
 from .reddit import RedditIntegration
+from .tripadvisor import TripAdvisorIntegration
 
 __all__ = [
     'AnthropicIntegration',
@@ -15,5 +16,6 @@ __all__ = [
     'VapiIntegration',
     'SpotifyIntegration',
     'NewsAPIIntegration',
-    'RedditIntegration'
+    'RedditIntegration',
+    'TripAdvisorIntegration'
 ]

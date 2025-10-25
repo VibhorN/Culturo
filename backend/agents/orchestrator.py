@@ -6,18 +6,10 @@ Main coordinator that analyzes user input and creates execution plans
 import json
 import logging
 import aiohttp
-import time
 from typing import Dict
-from core.base import BaseAgent, AgentResponse
+from .base import BaseAgent, AgentResponse
 
 logger = logging.getLogger(__name__)
-
-# Import logging system
-try:
-    from utils.logging import log_api_call
-except ImportError:
-    def log_api_call(*args, **kwargs):
-        pass
 
 
 class OrchestratorAgent(BaseAgent):
@@ -31,7 +23,7 @@ class OrchestratorAgent(BaseAgent):
     def __init__(self, anthropic_api_key: str):
         super().__init__("Orchestrator", anthropic_api_key)
     
-    async def _process_impl(self, input_data: Dict) -> AgentResponse:
+    async def process(self, input_data: Dict) -> AgentResponse:
         """
         Analyzes user input and creates execution plan
         """
@@ -74,51 +66,20 @@ class OrchestratorAgent(BaseAgent):
             User Language: {language}
             Context: {json.dumps(context)}
             
-            IMPORTANT: First determine if this is a SIMPLE CONVERSATIONAL QUERY that doesn't require cultural data.
-            
-            Look for keywords that indicate cultural interest: "interested", "curious", "want to learn", "tell me about", "what's like", "culture", "country name"
-            
-            Examples of SIMPLE CONVERSATIONAL QUERIES (don't pull data):
-            - "Who are you?"
-            - "What can you do?"
-            - "How are you?"
-            - "Tell me about yourself"
-            - "What's your name?"
-            - "Hello"
-            - "Hi there"
-            - "How does this work?"
-            
-            Examples of CULTURAL DATA QUERIES (do pull data):
-            - "Tell me about Japan"
-            - "What's the culture like in France?"
-            - "Teach me about Brazilian food"
-            - "How do people greet in Germany?"
-            - "What festivals are celebrated in India?"
-            - "I'm interested in Japan"
-            - "I want to learn about French culture"
-            - "I'm curious about Brazil"
-            - "Japan seems interesting"
-            - "I'd like to know more about Germany"
-            
             Determine:
-            1. What is the user's intent? (conversational, learn_language, cultural_info, pronunciation_help, travel_advice, etc.)
-            2. What country/culture are they interested in? (only if cultural data needed)
-            3. Which data sources should be queried? (only if cultural data needed: government, music, food, slang, news, etc.)
-            4. Which agents should be activated? (conversation is always included, others only if needed)
-               Available agents: conversation, data_retrieval, language_correction, translation
+            1. What is the user's intent? (learn_language, cultural_info, pronunciation_help, travel_advice, etc.)
+            2. What country/culture are they interested in?
+            3. Which data sources should be queried? 
+               Available sources: news, music, landmarks, restaurants, destinations, food, movies, government, festivals
+            4. Which agents should be activated? (language_correction, cultural_context, translation, etc.)
             5. Does this require real-time voice processing?
             6. Confidence level (0-1)
-            
-            For SIMPLE CONVERSATIONAL QUERIES:
-            - Set data_sources to empty array []
-            - Set agents_to_activate to ["conversation"] only
-            - Set target_country to "none"
             
             Respond in JSON format:
             {{
                 "intent": "intent_type",
-                "target_country": "country_name_or_none",
-                "data_sources": ["source1", "source2"] or [],
+                "target_country": "country_name",
+                "data_sources": ["source1", "source2"],
                 "agents_to_activate": ["agent1", "agent2"],
                 "requires_voice": true/false,
                 "confidence": 0.9,
@@ -139,26 +100,12 @@ class OrchestratorAgent(BaseAgent):
             }
             
             async with aiohttp.ClientSession() as session:
-                start_time = time.time()
                 async with session.post(
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json=data,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
-                    execution_time = time.time() - start_time
-                    
-                    # Log API call
-                    log_api_call(
-                        service="anthropic",
-                        endpoint="/v1/messages",
-                        method="POST",
-                        request_data=data,
-                        response_data={"status": response.status, "content": "..."},
-                        status_code=response.status,
-                        execution_time=execution_time
-                    )
-                    
                     if response.status == 200:
                         result = await response.json()
                         plan_text = result["content"][0]["text"]
@@ -181,9 +128,8 @@ class OrchestratorAgent(BaseAgent):
             "intent": "cultural_info",
             "target_country": "unknown",
             "data_sources": ["government", "music", "food"],
-            "agents_to_activate": ["data_retrieval", "conversation"],
+            "agents_to_activate": ["cultural_context", "conversation"],
             "requires_voice": False,
             "confidence": 0.3,
             "reasoning": "Fallback plan due to error"
         }
-

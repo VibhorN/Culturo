@@ -19,6 +19,12 @@ except ImportError:
     def log_api_call(*args, **kwargs):
         pass
 
+# Import integrations
+try:
+    from integrations import NewsAPIIntegration, SpotifyIntegration, TripAdvisorIntegration
+except ImportError:
+    logger.warning("Could not import integrations - using placeholder implementations")
+
 
 class DataRetrievalAgent(BaseAgent):
     """
@@ -29,13 +35,22 @@ class DataRetrievalAgent(BaseAgent):
     4. Retrieves and formats the data
     """
     
-    def __init__(self, anthropic_api_key: str):
+    def __init__(self, anthropic_api_key: str, news_api_key: str = None, spotify_client_id: str = None, spotify_client_secret: str = None, tripadvisor_api_key: str = None):
         super().__init__("DataRetrieval", anthropic_api_key)
+        
+        # Initialize integrations
+        self.news_integration = NewsAPIIntegration(news_api_key) if news_api_key else None
+        self.spotify_integration = SpotifyIntegration(spotify_client_id, spotify_client_secret) if spotify_client_id and spotify_client_secret else None
+        self.tripadvisor_integration = TripAdvisorIntegration(tripadvisor_api_key) if tripadvisor_api_key else None
+        
         self.available_apis = {
             "news": self._get_news_data,
+            "music": self._get_music_data,
+            "landmarks": self._get_landmarks_data,
+            "restaurants": self._get_restaurants_data,
+            "destinations": self._get_destinations_data,
             "food": self._get_food_data,  # Placeholder for future
             "movies": self._get_movies_data,  # Placeholder for future
-            "music": self._get_music_data,  # Placeholder for future
             "government": self._get_government_data,  # Placeholder for future
             "festivals": self._get_festivals_data,  # Placeholder for future
         }
@@ -211,10 +226,20 @@ class DataRetrievalAgent(BaseAgent):
         return retrieved_data
     
     async def _get_news_data(self, country: str) -> Dict:
-        """Get news data for the country"""
+        """Get news data for the country using NewsAPI"""
         try:
-            # This would use your actual NewsAPI implementation
-            # For now, return a placeholder structure
+            if self.news_integration:
+                articles = await self.news_integration.get_cultural_news(country)
+                if articles:
+                    return {
+                        "country": country,
+                        "articles": articles,
+                        "total_results": len(articles),
+                        "source": "news_api",
+                        "timestamp": "now"
+                    }
+            
+            # Fallback data
             return {
                 "country": country,
                 "articles": [
@@ -225,11 +250,117 @@ class DataRetrievalAgent(BaseAgent):
                         "source": "NewsAPI"
                     }
                 ],
-                "source": "news_api",
+                "source": "news_api_fallback",
                 "timestamp": "now"
             }
         except Exception as e:
             logger.error(f"[DataRetrieval] Error getting news data: {str(e)}")
+            return {"error": str(e)}
+    
+    async def _get_music_data(self, country: str) -> Dict:
+        """Get music data for the country using Spotify"""
+        try:
+            if self.spotify_integration:
+                playlists = await self.spotify_integration.search_playlists(country, limit=5)
+                if playlists:
+                    return {
+                        "country": country,
+                        "playlists": playlists,
+                        "total_results": len(playlists),
+                        "source": "spotify_api",
+                        "timestamp": "now"
+                    }
+            
+            # Fallback data
+            return {
+                "country": country,
+                "playlists": [
+                    {
+                        "name": f"Popular Music from {country}",
+                        "description": f"Trending music and artists from {country}",
+                        "tracks": {"total": 50}
+                    }
+                ],
+                "source": "spotify_api_fallback",
+                "timestamp": "now"
+            }
+        except Exception as e:
+            logger.error(f"[DataRetrieval] Error getting music data: {str(e)}")
+            return {"error": str(e)}
+    
+    async def _get_landmarks_data(self, country: str) -> Dict:
+        """Get historical landmarks for the country using TripAdvisor"""
+        try:
+            if self.tripadvisor_integration:
+                landmarks = await self.tripadvisor_integration.get_historical_landmarks(country, limit=5)
+                if landmarks:
+                    return landmarks
+            
+            # Fallback data
+            return {
+                "country": country,
+                "category": "attractions",
+                "locations": [
+                    {
+                        "name": f"Historical Landmarks in {country}",
+                        "description": f"Famous historical sites and monuments in {country}"
+                    }
+                ],
+                "source": "tripadvisor_api_fallback",
+                "timestamp": "now"
+            }
+        except Exception as e:
+            logger.error(f"[DataRetrieval] Error getting landmarks data: {str(e)}")
+            return {"error": str(e)}
+    
+    async def _get_restaurants_data(self, country: str) -> Dict:
+        """Get popular restaurants for the country using TripAdvisor"""
+        try:
+            if self.tripadvisor_integration:
+                restaurants = await self.tripadvisor_integration.get_popular_restaurants(country, limit=5)
+                if restaurants:
+                    return restaurants
+            
+            # Fallback data
+            return {
+                "country": country,
+                "category": "restaurants",
+                "locations": [
+                    {
+                        "name": f"Traditional Restaurants in {country}",
+                        "description": f"Popular local cuisine and dining spots in {country}"
+                    }
+                ],
+                "source": "tripadvisor_api_fallback",
+                "timestamp": "now"
+            }
+        except Exception as e:
+            logger.error(f"[DataRetrieval] Error getting restaurants data: {str(e)}")
+            return {"error": str(e)}
+    
+    async def _get_destinations_data(self, country: str) -> Dict:
+        """Get tourist destinations for the country using TripAdvisor"""
+        try:
+            if self.tripadvisor_integration:
+                destinations = await self.tripadvisor_integration.get_tourist_destinations(country, limit=5)
+                if destinations:
+                    return destinations
+            
+            # Fallback data
+            return {
+                "country": country,
+                "category": "attractions",
+                "locations": [
+                    {
+                        "name": f"Must-Visit Destinations in {country}",
+                        "description": f"Top tourist attractions and places to visit in {country}"
+                    }
+                ],
+                "source": "tripadvisor_api_fallback",
+                "timestamp": "now"
+            }
+        except Exception as e:
+            logger.error(f"[DataRetrieval] Error getting destinations data: {str(e)}")
             return {"error": str(e)}
     
     async def _get_food_data(self, country: str) -> Dict:
@@ -246,14 +377,6 @@ class DataRetrievalAgent(BaseAgent):
             "country": country,
             "message": "Movies API not yet implemented",
             "source": "movies_api"
-        }
-    
-    async def _get_music_data(self, country: str) -> Dict:
-        """Get music data for the country (placeholder)"""
-        return {
-            "country": country,
-            "message": "Music API not yet implemented",
-            "source": "music_api"
         }
     
     async def _get_government_data(self, country: str) -> Dict:

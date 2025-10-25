@@ -386,6 +386,7 @@ const FloatingElement = styled(motion.div)`
 function App() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentUtterance, setCurrentUtterance] = useState(null);
   const [country, setCountry] = useState('');
   const [culturalData, setCulturalData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -472,15 +473,38 @@ function App() {
 
   const speak = (text) => {
     if (synthesisRef.current) {
+      // Stop any current speech
+      if (currentUtterance) {
+        synthesisRef.current.cancel();
+      }
+      
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 0.8;
       
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setCurrentUtterance(utterance);
+      };
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        setCurrentUtterance(null);
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setCurrentUtterance(null);
+      };
       
       synthesisRef.current.speak(utterance);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if (synthesisRef.current && currentUtterance) {
+      synthesisRef.current.cancel();
+      setIsSpeaking(false);
+      setCurrentUtterance(null);
     }
   };
 
@@ -683,7 +707,7 @@ function App() {
           
           <VoiceButton
             $active={isSpeaking}
-            onClick={() => speak('Yo sigma, try me out to learn some cool shit')}
+            onClick={isSpeaking ? stopSpeaking : () => speak('Hello! I\'m WorldWise, your cultural immersion companion. Ask me about any country!')}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -753,6 +777,29 @@ function App() {
                   <p style={{ fontSize: '1.1rem', lineHeight: '1.6', margin: 0 }}>
                     {culturalData.response}
                   </p>
+                  
+                  {/* Agent Thinking Process - Always show if available */}
+                  {culturalData.metadata?.agent_responses?.conversation?.thinking_process && (
+                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        🤖 Agent Thinking Process
+                      </h4>
+                      <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', lineHeight: '1.5' }}>
+                        {culturalData.metadata.agent_responses.conversation.thinking_process.map((step, index) => (
+                          <li key={index} style={{ marginBottom: '5px', color: '#e0e0e0' }}>
+                            {step}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {/* Debug: Show raw thinking process if available */}
+                  {culturalData.metadata?.agent_responses?.conversation?.thinking_process && (
+                    <div style={{ marginTop: '10px', padding: '10px', backgroundColor: 'rgba(255, 0, 0, 0.1)', borderRadius: '5px', fontSize: '0.8rem' }}>
+                      <strong>Debug:</strong> Found {culturalData.metadata.agent_responses.conversation.thinking_process.length} thinking steps
+                    </div>
+                  )}
                 </CardContent>
               </ContentCard>
             ) : (

@@ -24,7 +24,7 @@ class AgentOrchestrator:
     Main orchestrator that coordinates all agents
     """
     
-    def __init__(self, anthropic_api_key: str):
+    def __init__(self, anthropic_api_key: str, news_api_key: str = None, spotify_client_id: str = None, spotify_client_secret: str = None, tripadvisor_api_key: str = None):
         self.orchestrator = OrchestratorAgent(anthropic_api_key)
         self.language_correction = LanguageCorrectionAgent(anthropic_api_key)
         self.cultural_context = CulturalContextAgent(anthropic_api_key)
@@ -32,7 +32,13 @@ class AgentOrchestrator:
         self.conversation = ConversationAgent(anthropic_api_key)
         self.evaluation = EvaluationAgent(anthropic_api_key)
         self.personalization = PersonalizationAgent()
-        self.data_retrieval = DataRetrievalAgent(anthropic_api_key)
+        self.data_retrieval = DataRetrievalAgent(
+            anthropic_api_key, 
+            news_api_key, 
+            spotify_client_id, 
+            spotify_client_secret, 
+            tripadvisor_api_key
+        )
         logger.info("AgentOrchestrator initialized with all agents using Anthropic API")
     
     async def process_input(self, user_input: Dict) -> Dict:

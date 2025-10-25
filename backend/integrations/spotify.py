@@ -1,23 +1,26 @@
 """
-Spotify Music Integration
+Spotify API Integration
+Handles music data retrieval for cultural context
 """
 
 import aiohttp
 import logging
 from datetime import datetime
+from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
 
 class SpotifyIntegration:
     """Integration with Spotify API for music data"""
     
-    def __init__(self, client_id, client_secret):
+    def __init__(self, client_id: str, client_secret: str):
         self.client_id = client_id
         self.client_secret = client_secret
         self.access_token = None
-        self.token_expires_at = 0
+        self.token_expires_at = 0  # Initialize to 0 instead of None
     
-    async def get_access_token(self):
+    async def get_access_token(self) -> bool:
         """Get Spotify access token"""
         try:
             auth_url = "https://accounts.spotify.com/api/token"
@@ -46,7 +49,7 @@ class SpotifyIntegration:
             logger.error(f"Error getting Spotify token: {str(e)}")
             return False
     
-    async def search_playlists(self, country, limit=5):
+    async def search_playlists(self, country: str, limit: int = 5) -> Optional[List[Dict]]:
         """Search for country-specific playlists"""
         try:
             if not self.access_token or datetime.now().timestamp() >= self.token_expires_at:
