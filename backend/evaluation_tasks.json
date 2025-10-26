@@ -1,0 +1,50 @@
+{
+  "learning_progress_evaluation": {
+    "description": "Evaluate learning progress across all agents",
+    "agent": "Evaluation",
+    "criteria": {
+      "language_improvement": "excellent/good/needs_work",
+      "cultural_understanding": "excellent/good/needs_work",
+      "engagement_level": "high/medium/low"
+    },
+    "schedule": "continuous",
+    "thresholds": {
+      "excellent": 0.8,
+      "good": 0.6,
+      "needs_work": 0.4
+    }
+  },
+  "agent_performance_evaluation": {
+    "description": "Monitor agent performance metrics",
+    "agents": [
+      "all"
+    ],
+    "criteria": {
+      "confidence_score": "float 0.0-1.0",
+      "execution_time_ms": "int",
+      "success_rate": "float 0.0-1.0",
+      "error_rate": "float 0.0-1.0"
+    },
+    "schedule": "continuous",
+    "alerts": {
+      "low_confidence": 0.5,
+      "high_execution_time": 5000,
+      "high_error_rate": 0.1
+    }
+  },
+  "user_satisfaction_evaluation": {
+    "description": "Track user satisfaction and engagement",
+    "agent": "all",
+    "criteria": {
+      "session_completion_rate": "float 0.0-1.0",
+      "interaction_quality": "float 0.0-1.0",
+      "learning_progress_rate": "float 0.0-1.0"
+    },
+    "schedule": "daily",
+    "thresholds": {
+      "high_satisfaction": 0.8,
+      "medium_satisfaction": 0.6,
+      "low_satisfaction": 0.4
+    }
+  }
+}

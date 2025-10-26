@@ -1,10 +1,9 @@
 flask==3.0.0
 flask-cors==4.0.0
 requests==2.31.0
-boto3==1.34.0
 anthropic==0.7.8
 deepgram-sdk==3.2.7
-vapi-python==0.1.9
+vapi-python==1.0.0
 python-dotenv==1.0.0
 pydantic==2.5.0
 httpx==0.25.2
@@ -21,3 +20,10 @@ alembic==1.13.1
 psycopg2-binary==2.9.9
 celery==5.3.4
 gunicorn==21.2.0
+arize==7.0.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation==0.42b0
+opentelemetry-instrumentation-aiohttp-client==0.42b0
+opentelemetry-instrumentation-requests==0.42b0
+opentelemetry-exporter-otlp==1.21.0

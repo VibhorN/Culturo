@@ -1,0 +1,96 @@
+{
+  "dashboards": [
+    {
+      "name": "Agent Performance Overview",
+      "description": "High-level view of all agent performance",
+      "widgets": [
+        {
+          "type": "metric",
+          "title": "Overall Success Rate",
+          "metric": "success_rate",
+          "aggregation": "average"
+        },
+        {
+          "type": "metric",
+          "title": "Average Execution Time",
+          "metric": "execution_time_ms",
+          "aggregation": "average"
+        },
+        {
+          "type": "chart",
+          "title": "Confidence Scores Over Time",
+          "metric": "confidence_score",
+          "chart_type": "line"
+        }
+      ]
+    },
+    {
+      "name": "Learning Progress Analytics",
+      "description": "Detailed learning progress and evaluation metrics",
+      "widgets": [
+        {
+          "type": "metric",
+          "title": "Learning Progress Score",
+          "metric": "learning_progress_score",
+          "aggregation": "average"
+        },
+        {
+          "type": "chart",
+          "title": "User Engagement Trends",
+          "metric": "engagement_level",
+          "chart_type": "bar"
+        },
+        {
+          "type": "table",
+          "title": "Top Improvement Areas",
+          "metric": "improvement_areas",
+          "aggregation": "count"
+        }
+      ]
+    },
+    {
+      "name": "Error Monitoring",
+      "description": "Agent error tracking and debugging",
+      "widgets": [
+        {
+          "type": "metric",
+          "title": "Error Rate",
+          "metric": "error_rate",
+          "aggregation": "average"
+        },
+        {
+          "type": "chart",
+          "title": "Errors by Agent",
+          "metric": "error_count",
+          "chart_type": "pie"
+        },
+        {
+          "type": "table",
+          "title": "Recent Errors",
+          "metric": "error_logs",
+          "aggregation": "latest"
+        }
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "name": "High Error Rate Alert",
+      "condition": "error_rate > 0.1",
+      "severity": "warning",
+      "notification": "email"
+    },
+    {
+      "name": "Low Confidence Alert",
+      "condition": "confidence_score < 0.5",
+      "severity": "info",
+      "notification": "slack"
+    },
+    {
+      "name": "Performance Degradation Alert",
+      "condition": "execution_time_ms > 10000",
+      "severity": "critical",
+      "notification": "email"
+    }
+  ]
+}
