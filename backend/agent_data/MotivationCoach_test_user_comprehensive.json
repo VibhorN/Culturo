@@ -2,16 +2,16 @@
   "data": {
     "current_streak": 0,
     "longest_streak": 0,
-    "total_sessions": 33,
+    "total_sessions": 2,
     "achievements": [],
     "milestones": [],
     "motivation_level": "high",
-    "last_session_date": "2025-10-25T21:08:05.022860",
+    "last_session_date": "2025-10-25T21:27:09.018877",
     "personal_records": {},
     "challenges_completed": 0,
     "encouragement_history": []
   },
-  "last_updated": "2025-10-25T21:08:05.022876",
+  "last_updated": "2025-10-25T21:27:09.018905",
   "agent_name": "MotivationCoach",
-  "user_id": "test"
+  "user_id": "test_user_comprehensive"
 }

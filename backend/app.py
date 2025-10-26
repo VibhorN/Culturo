@@ -45,6 +45,23 @@ news_api = NewsAPIIntegration(NEWS_API_KEY) if NEWS_API_KEY else None
 reddit = RedditIntegration(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, "WorldWise-CulturalBot/1.0") if REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET else None
 claude = AnthropicIntegration(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
+# Make Anthropic client available globally for Arize evaluations
+try:
+    import anthropic
+    anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+except ImportError:
+    anthropic_client = None
+
+# Initialize Arize Agent Evaluations Project
+try:
+    from integrations.arize_agent_evaluations import arize_agent_evaluations
+    if arize_agent_evaluations.enabled:
+        logger.info("Arize Agent Evaluations Project initialized successfully")
+    else:
+        logger.warning("Arize Agent Evaluations Project not enabled")
+except Exception as e:
+    logger.warning(f"Failed to initialize Arize Agent Evaluations Project: {str(e)}")
+
 # Initialize Agent Orchestrator with Anthropic API
 try:
     agent_orchestrator = AgentOrchestrator(
@@ -54,6 +71,9 @@ try:
         SPOTIFY_CLIENT_SECRET,
         TRIPADVISOR_API_KEY
     )
+    # Pass the Anthropic client to the orchestrator for evaluations
+    if agent_orchestrator and anthropic_client:
+        agent_orchestrator.anthropic_client = anthropic_client
     logger.info("Agent orchestrator initialized with Anthropic API and all integrations")
 except Exception as e:
     logger.warning(f"Failed to initialize agent orchestrator: {str(e)}")
