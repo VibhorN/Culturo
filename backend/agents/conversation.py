@@ -27,16 +27,21 @@ class ConversationAgent(BaseAgent):
         try:
             user_query = input_data.get("query", "")
             context = input_data.get("context", {})
-            cultural_data = input_data.get("cultural_data", {})
+            retrieved_data = input_data.get("retrieved_data", {})
             language_corrections = input_data.get("language_corrections", {})
+            has_retrieved_data = input_data.get("has_retrieved_data", False)
             
             logger.info(f"[Conversation] Generating response to: '{user_query}'")
+            logger.info(f"[Conversation] Has retrieved data: {has_retrieved_data}")
+            if retrieved_data:
+                logger.info(f"[Conversation] Retrieved data keys: {list(retrieved_data.keys())}")
             
             response = await self._generate_response(
                 user_query, 
                 context, 
-                cultural_data,
-                language_corrections
+                retrieved_data,
+                language_corrections,
+                has_retrieved_data
             )
             
             return AgentResponse(
@@ -56,24 +61,46 @@ class ConversationAgent(BaseAgent):
                 confidence=0.0
             )
     
-    async def _generate_response(self, query: str, context: Dict, cultural_data: Dict, corrections: Dict) -> Dict:
+    async def _generate_response(self, query: str, context: Dict, retrieved_data: Dict, corrections: Dict, has_retrieved_data: bool) -> Dict:
         """Use Claude via Anthropic API to generate conversational response"""
         try:
+            # Format retrieved data for better presentation
+            data_summary = ""
+            if has_retrieved_data and retrieved_data:
+                data_summary = "\n\nRETRIEVED DATA TO USE IN RESPONSE:\n"
+                for source, data in retrieved_data.items():
+                    if source != "_retrieval_log" and data:
+                        data_summary += f"\n{source.upper()}:\n"
+                        if isinstance(data, dict):
+                            for key, value in data.items():
+                                if isinstance(value, list) and len(value) > 0:
+                                    data_summary += f"  {key}: {value[:3]}{'...' if len(value) > 3 else ''}\n"
+                                elif isinstance(value, str) and len(value) > 0:
+                                    data_summary += f"  {key}: {value[:100]}{'...' if len(value) > 100 else ''}\n"
+                                elif value:
+                                    data_summary += f"  {key}: {value}\n"
+                        elif isinstance(data, list) and len(data) > 0:
+                            data_summary += f"  Items: {data[:3]}{'...' if len(data) > 3 else ''}\n"
+                        elif data:
+                            data_summary += f"  Data: {str(data)[:100]}{'...' if len(str(data)) > 100 else ''}\n"
+            
             prompt = f"""
             You are WorldWise, a friendly cultural immersion AI assistant.
             Generate a natural, engaging response to the user's query.
             
             User Query: "{query}"
             Context: {json.dumps(context)}
-            Cultural Data: {json.dumps(cultural_data)}
+            Has Retrieved Data: {has_retrieved_data}
             Language Corrections: {json.dumps(corrections)}
+            {data_summary}
             
             Guidelines:
             - Be warm, helpful, and culturally sensitive
             - Keep responses SHORT and CONCISE (2-3 sentences maximum for voice)
             - For simple conversational queries (like "Who are you?", "What can you do?"), give a direct, friendly response about WorldWise
-            - For cultural queries, incorporate retrieved data naturally and show enthusiasm about the culture
-            - For interest statements (like "I'm interested in Japan"), respond enthusiastically and provide engaging cultural information
+            - For cultural queries, ALWAYS use the retrieved data above to provide specific, accurate information
+            - If retrieved data is available, prioritize it over generic knowledge
+            - For restaurant/food recommendations, use specific names and details from the retrieved data
             - Address any language corrections gently
             - Ask ONE follow-up question to deepen engagement
             - Keep responses conversational, not academic
@@ -88,12 +115,12 @@ class ConversationAgent(BaseAgent):
                 "learning_tips": ["tip1", "tip2"],
                 "tone": "friendly/encouraging/curious",
                 "confidence": 0.9,
-                "reasoning": "Detailed explanation of how you processed the query, what cultural data you used, and why you chose this response approach",
+                "reasoning": "Detailed explanation of how you processed the query, what retrieved data you used, and why you chose this response approach",
                 "thinking_process": [
                     "Step 1: Analyzed user intent",
-                    "Step 2: Identified relevant cultural data",
+                    "Step 2: Identified relevant retrieved data",
                     "Step 3: Selected key insights to highlight",
-                    "Step 4: Crafted concise response"
+                    "Step 4: Crafted concise response using specific data"
                 ]
             }}
             """

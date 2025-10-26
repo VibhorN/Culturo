@@ -123,6 +123,7 @@ class DataRetrievalAgent(BaseAgent):
             Available data sources:
             - news: Current news and events
             - food: Food recommendations and cuisine information
+            - restaurants: Restaurant recommendations and dining spots
             - movies: Movies and entertainment
             - music: Music and cultural music
             - government: Government and political information
@@ -138,6 +139,7 @@ class DataRetrievalAgent(BaseAgent):
             Examples:
             - "I'm interested in Japan" → needs_clarification: true, ask what aspect
             - "Tell me about Japanese food" → clear, use food API
+            - "Sushi recommendations in Japan" → clear, use restaurants API
             - "What's happening in Japan?" → clear, use news API
             - "Japanese culture" → needs_clarification: true, ask what aspect
             
