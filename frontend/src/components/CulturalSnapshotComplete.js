@@ -256,9 +256,18 @@ function CulturalSnapshotComplete({ query, userId, onVoiceInput }) {
 
       const data = response.data;
       
+      console.log('📊 CulturalSnapshotComplete: Received data:', {
+        country: data.country,
+        feedLength: data.feed?.length || 0,
+        triviaLength: data.triviaQuestions?.length || 0,
+        triviaQuestions: data.triviaQuestions
+      });
+      
       setCountry(data.country);
       setInterests(data.interests);
       setFeed(data.feed || []);
+      
+      console.log('✅ Setting triviaQuestions:', data.triviaQuestions?.length || 0, 'questions');
       setTriviaQuestions(data.triviaQuestions || []);
       
       setLoading(false);

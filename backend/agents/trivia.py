@@ -144,22 +144,48 @@ class TriviaAgent(BaseAgent):
                         # Extract JSON array
                         start_idx = questions_text.find('[')
                         end_idx = questions_text.rfind(']') + 1
-                        if start_idx != -1 and end_idx > start_idx:
+                        
+                        if start_idx == -1:
+                            raise Exception("Could not find '[' in Claude's response")
+                        
+                        if end_idx <= start_idx:
+                            raise Exception("Could not find ']' in Claude's response")
+                        
+                        try:
                             questions = json.loads(questions_text[start_idx:end_idx])
                             
                             # Ensure exactly 5 questions
                             questions = questions[:5]
                             
+                            # Validate questions structure
+                            if not isinstance(questions, list):
+                                raise Exception("Questions is not a list")
+                            
+                            if len(questions) == 0:
+                                raise Exception("No questions generated")
+                            
+                            # Validate each question has required fields
+                            required_fields = ['question', 'options', 'correct_answer']
+                            for i, q in enumerate(questions):
+                                for field in required_fields:
+                                    if field not in q:
+                                        raise Exception(f"Question {i} missing required field: {field}")
+                            
                             logger.info(f"[Trivia] Generated {len(questions)} unique questions from content")
                             return questions
+                        except json.JSONDecodeError as je:
+                            raise Exception(f"Failed to parse JSON from Claude response: {str(je)}")
                     
                     raise Exception(f"Anthropic API error: {response.status}")
                     
         except Exception as e:
             logger.error(f"[Trivia] Error generating questions: {str(e)}")
+            logger.error(f"[Trivia] Falling back to basic questions due to error: {type(e).__name__}")
         
         # Fallback: generate 5 basic questions from content
-        return self._generate_fallback_questions(country, content_cards)
+        fallback_questions = self._generate_fallback_questions(country, content_cards)
+        logger.warning(f"[Trivia] Using {len(fallback_questions)} fallback questions for {country}")
+        return fallback_questions
     
     def _build_detailed_content_summary(self, content_cards: List[Dict]) -> str:
         """Create detailed summary of content cards"""
@@ -209,6 +235,7 @@ Attraction {idx + 1}:
     
     def _generate_fallback_questions(self, country: str, content_cards: List[Dict]) -> List[Dict]:
         """Generate 5 basic fallback questions from content"""
+        logger.info(f"[Trivia] Fallback: Generating basic questions for {country} from {len(content_cards)} content cards")
         questions = []
         
         # Check what content types we have

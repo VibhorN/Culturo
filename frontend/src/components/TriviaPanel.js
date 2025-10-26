@@ -169,9 +169,35 @@ function TriviaPanel({ questions, country }) {
   const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
-    if (questions && questions.length > 0) {
-      setQuestionQueue(questions.map((q, idx) => ({ ...q, originalIndex: idx })));
+    console.log('🎯 TriviaPanel: Received questions prop:', questions);
+    
+    if (!questions || !Array.isArray(questions)) {
+      console.warn('⚠️ TriviaPanel: questions is not a valid array:', questions);
+      setQuestionQueue([]);
+      return;
     }
+    
+    if (questions.length === 0) {
+      console.warn('⚠️ TriviaPanel: Received empty questions array');
+      setQuestionQueue([]);
+      return;
+    }
+    
+    // Validate question structure
+    const validQuestions = questions.filter(q => 
+      q && 
+      typeof q.question === 'string' &&
+      Array.isArray(q.options) &&
+      q.options.length === 4 &&
+      typeof q.correct_answer === 'number'
+    );
+    
+    if (validQuestions.length !== questions.length) {
+      console.error('⚠️ TriviaPanel: Some questions have invalid structure', questions);
+    }
+    
+    console.log('✅ TriviaPanel: Setting question queue with', validQuestions.length, 'questions');
+    setQuestionQueue(validQuestions.map((q, idx) => ({ ...q, originalIndex: idx })));
   }, [questions]);
 
   const currentQuestion = questionQueue[currentIndex];
