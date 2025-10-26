@@ -22,6 +22,7 @@ from agents.learning.vocabulary_builder import VocabularyBuilderAgent
 from agents.cultural_agents.cultural_etiquette import CulturalEtiquetteAgent
 from agents.analysis.progress_analytics import ProgressAnalyticsAgent
 from agents.cognitive.motivation_coach import MotivationCoachAgent
+from integrations.arize_agent_evaluations import log_query_evaluation # New import for Arize Agent Evaluations Project
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,49 @@ class AgentOrchestrator:
         # Keep only last 10 conversations
         if len(self.conversation_context[user_id]["conversation_history"]) > 10:
             self.conversation_context[user_id]["conversation_history"] = self.conversation_context[user_id]["conversation_history"][-10:]
+    
+    async def _log_to_simplified_arize(self, user_id: str, user_input: Dict, 
+                                     final_response: Dict, agent_responses: Dict, 
+                                     agents_activated: List[str]):
+        """Log query evaluation to simplified Arize integration"""
+        try:
+            # Prepare agents_used data for logging
+            agents_used = {}
+            
+            for agent_name in agents_activated:
+                if agent_name in agent_responses:
+                    agent_response = agent_responses[agent_name]
+                    
+                    # Extract agent data
+                    agents_used[agent_name] = {
+                        "output_data": agent_response.__dict__ if hasattr(agent_response, '__dict__') else {},
+                        "execution_time": getattr(agent_response, 'execution_time', 0),
+                        "confidence": getattr(agent_response, 'confidence', 0),
+                        "status": getattr(agent_response, 'status', 'success'),
+                        "usage_reason": f"Activated by orchestrator for {user_input.get('query', 'unknown query')}"
+                    }
+            
+            # Get Anthropic client for evaluations
+            anthropic_client = getattr(self, 'anthropic_client', None)
+            if not anthropic_client:
+                # Try to get from app context
+                try:
+                    from app import anthropic_client as app_anthropic
+                    anthropic_client = app_anthropic
+                except:
+                    logger.warning("No Anthropic client available for evaluations")
+            
+            # Log to simplified Arize
+            await log_query_evaluation(
+                user_id=user_id,
+                question=user_input.get('query', ''),
+                response=final_response.get('response', ''),
+                agents_used=agents_used,
+                anthropic_client=anthropic_client
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to log to simplified Arize: {str(e)}")
     
     async def process_input(self, user_input: Dict) -> Dict:
         """
@@ -312,6 +356,11 @@ class AgentOrchestrator:
             
             # Update conversation context
             self._update_user_context(user_id, execution_plan, final_response["response"])
+            
+            # Log to simplified Arize integration
+            await self._log_to_simplified_arize(
+                user_id, user_input, final_response, agent_responses, agents_activated
+            )
             
             logger.info(f"[AgentOrchestrator] Completed in {0.82}s")
             return final_response

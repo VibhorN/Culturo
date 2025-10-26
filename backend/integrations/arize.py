@@ -57,12 +57,13 @@ class ArizeIntegration:
         self.api_key = os.getenv("ARIZE_API_KEY")
         self.project_name = os.getenv("ARIZE_PROJECT_NAME", "lingua-cal-agents")
         self.environment = os.getenv("ARIZE_ENVIRONMENT", "development")
-        self.enabled = ARIZE_AVAILABLE and self.space_id and self.api_key
+        # Disable old integration to prevent conflicts
+        self.enabled = False
         
         if self.enabled:
             self._initialize_arize()
         else:
-            logger.warning("Arize integration disabled. Missing credentials or dependencies.")
+            logger.warning("Old Arize integration disabled to prevent conflicts with simplified integration.")
     
     def _initialize_arize(self):
         """Initialize Arize client and tracing"""
