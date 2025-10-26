@@ -65,16 +65,53 @@ class TripAdvisorIntegration:
             }
         }
 
+    def _normalize_country_name(self, country: str) -> str:
+        """Normalize country name to match TripAdvisor mappings"""
+        country_mapping = {
+            "spain": "Spain",
+            "france": "France", 
+            "japan": "Japan",
+            "italy": "Italy",
+            "germany": "Germany",
+            "united kingdom": "United Kingdom",
+            "uk": "United Kingdom",
+            "usa": "United States",
+            "united states": "United States",
+            "canada": "Canada",
+            "australia": "Australia",
+            "brazil": "Brazil",
+            "mexico": "Mexico",
+            "india": "India",
+            "china": "China",
+            "russia": "Russia"
+        }
+        
+        # Try exact match first
+        if country in self.country_coordinate_mappings:
+            return country
+            
+        # Try lowercase mapping
+        normalized = country_mapping.get(country.lower(), country)
+        
+        # If still not found, try title case
+        if normalized not in self.country_coordinate_mappings:
+            normalized = country.title()
+            
+        return normalized
+
     def get_popular_locations(self, country: str, category: str, search_query: str, limit: int = 10) -> Optional[List[Dict]]:
         """
         Get popular locations for a given country, category, and search term.
         Returns a list of dicts with name, description, and photo URL.
         """
-        if country not in self.country_coordinate_mappings or category not in ["restaurants", "hotels", "attractions"]:
-            logger.warning(f"Country {country} or category {category} not supported")
+        # Normalize country name to match our mappings
+        normalized_country = self._normalize_country_name(country)
+        
+        if normalized_country not in self.country_coordinate_mappings or category not in ["restaurants", "hotels", "attractions"]:
+            logger.warning(f"Country {normalized_country} or category {category} not supported")
             return None
 
-        location_params = self.country_coordinate_mappings[country]
+        location_params = self.country_coordinate_mappings[normalized_country]
         headers = {"Accept": "application/json"}
         params = {
             "key": self.api_key,
