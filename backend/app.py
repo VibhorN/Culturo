@@ -610,10 +610,50 @@ async def orchestrate():
         
         questions = trivia_result.data.get("questions", []) if trivia_result.status == "success" else []
         
+        # Log cultural snapshot to Phoenix
+        try:
+            from integrations.arize_phoenix_tracing import log_agent_evaluation
+            import anthropic
+            
+            # Build response summary for evaluation
+            response_summary = f"Created cultural snapshot for {country} with {len(cards)} content cards and {len(questions)} trivia questions"
+            
+            agents_used = {
+                "ContentFeedAgent": {
+                    "output_data": {"cards": len(cards)},
+                    "execution_time": 0,
+                    "confidence": feed_result.confidence,
+                    "status": feed_result.status,
+                    "usage_reason": "Generate cultural content",
+                    "reasoning": feed_result.reasoning if hasattr(feed_result, 'reasoning') else "",
+                    "thought_process": feed_result.reasoning if hasattr(feed_result, 'reasoning') else ""
+                },
+                "TriviaAgent": {
+                    "output_data": {"questions": len(questions)},
+                    "execution_time": 0,
+                    "confidence": trivia_result.confidence,
+                    "status": trivia_result.status,
+                    "usage_reason": "Generate trivia questions",
+                    "reasoning": trivia_result.reasoning if hasattr(trivia_result, 'reasoning') else "",
+                    "thought_process": trivia_result.reasoning if hasattr(trivia_result, 'reasoning') else ""
+                }
+            }
+            
+            anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+            asyncio.create_task(log_agent_evaluation(
+                user_id=userId,
+                question=query,
+                response=response_summary,
+                agents_used=agents_used,
+                anthropic_client=anthropic_client
+            ))
+        except Exception as e:
+            logger.error(f"Failed to log to Phoenix: {str(e)}")
+        
         return jsonify({
             "country": country,
             "feed": cards,
-            "triviaQuestions": questions,  # Changed from "trivia" to match frontend expectation
+            "triviaQuestions": questions,
             "interests": interests
         })
         

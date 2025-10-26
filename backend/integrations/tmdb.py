@@ -45,9 +45,13 @@ class TMDBIntegration:
 
                 if trailers:
                     trailer = trailers[0]
-                    youtube_link = f"https://www.youtube.com/watch?v={trailer['key']}"
-                    logger.info(f"🎬 Found trailer: {trailer['name']}")
-                    return youtube_link
+                    # Check if trailer has a valid key
+                    if trailer.get('key'):
+                        youtube_link = f"https://www.youtube.com/watch?v={trailer['key']}"
+                        logger.info(f"🎬 Found trailer: {trailer['name']}")
+                        return youtube_link
+                    else:
+                        logger.warning(f"Trailer found for '{movie_name}' but no key available")
 
                 logger.info(f"No YouTube trailers found for '{movie_name}'.")
                 return None
