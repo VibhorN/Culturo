@@ -20,26 +20,44 @@ class NewsAPIIntegration:
     async def get_cultural_news(self, country: str, language: str = "en") -> Optional[List[Dict]]:
         """Get cultural news for a country"""
         try:
+            if not self.api_key:
+                logger.warning("NewsAPI key not configured")
+                return None
+                
             headers = {"X-API-Key": self.api_key}
             
-            # Multiple search queries for comprehensive coverage
-            queries = [
-                f"{country} culture",
-                f"{country} traditions",
-                f"{country} festivals",
-                f"{country} music",
-                f"{country} food"
-            ]
-            
-            all_articles = []
-            
             async with aiohttp.ClientSession() as session:
+                # Use everything endpoint with country-specific queries
+                # Country-specific city/capital additions for better results
+                country_capitals = {
+                    "Japan": "Tokyo",
+                    "France": "Paris", 
+                    "Italy": "Rome",
+                    "Spain": "Madrid",
+                    "Mexico": "Mexico City",
+                    "India": "New Delhi",
+                    "China": "Beijing",
+                    "Thailand": "Bangkok",
+                    "Germany": "Berlin"
+                }
+                
+                capital = country_capitals.get(country, "")
+                
+                queries = [
+                    f"{country} {capital}" if capital else f"{country}",  # Country + capital
+                    f"{country} latest news",  # Latest news
+                    f"breaking news {country}"  # Breaking news
+                ]
+                
+                all_articles = []
+                used_urls = set()
+                
                 for query in queries:
                     params = {
                         "q": query,
                         "language": language,
                         "sortBy": "publishedAt",
-                        "pageSize": 3
+                        "pageSize": 5
                     }
                     
                     async with session.get(
@@ -50,18 +68,20 @@ class NewsAPIIntegration:
                         if response.status == 200:
                             result = await response.json()
                             articles = result.get("articles", [])
-                            all_articles.extend(articles)
-            
-            # Remove duplicates and return top results
-            unique_articles = []
-            seen_urls = set()
-            
-            for article in all_articles:
-                if article["url"] not in seen_urls and article["title"] != "[Removed]":
-                    unique_articles.append(article)
-                    seen_urls.add(article["url"])
-            
-            return unique_articles[:5]
+                            
+                            # Add unique articles
+                            for article in articles:
+                                url = article.get("url", "")
+                                if url and url not in used_urls and article.get("title") != "[Removed]":
+                                    all_articles.append(article)
+                                    used_urls.add(url)
+                
+                if all_articles:
+                    logger.info(f"✅ Got {len(all_articles)} news articles for {country}")
+                    return all_articles[:10]  # Return up to 10 articles
+                else:
+                    logger.warning(f"No valid news articles found for {country}")
+                    return None
             
         except Exception as e:
             logger.error(f"Error getting cultural news: {str(e)}")

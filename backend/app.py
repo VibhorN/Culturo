@@ -572,6 +572,200 @@ async def agent_translate():
         logger.error(f"Error in translation: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/orchestrate', methods=['POST'])
+async def orchestrate():
+    """Create cultural snapshot from user query"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        userId = data.get('userId', 'test')
+        
+        if not query:
+            return jsonify({"error": "Missing query"}), 400
+        
+        # Use OrchestratorAgent and ContentFeedAgent to generate cultural snapshot
+        from agents import OrchestratorAgent, ContentFeedAgent, TriviaAgent
+        
+        # Initialize agents
+        content_feed = ContentFeedAgent(ANTHROPIC_API_KEY)
+        trivia = TriviaAgent(ANTHROPIC_API_KEY)
+        
+        # Step 1: Extract country from query using Claude
+        country = await _extract_country(query, ANTHROPIC_API_KEY)
+        
+        if not country:
+            return jsonify({"error": "Could not determine country from query"}), 400
+        
+        # Step 2: Generate content feed with default interests for cultural snapshot
+        interests = ["news", "movies", "music", "food", "landmarks"]
+        
+        feed_result = await content_feed.process({
+            "country": country,
+            "interests": interests
+        })
+        
+        cards = feed_result.data.get("cards", []) if feed_result.status == "success" else []
+        
+        # Step 3: Generate trivia
+        trivia_result = await trivia.process({
+            "cards": cards,
+            "country": country
+        })
+        
+        questions = trivia_result.data.get("questions", []) if trivia_result.status == "success" else []
+        
+        return jsonify({
+            "country": country,
+            "feed": cards,
+            "trivia": questions,
+            "interests": interests
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in orchestrate: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+async def _extract_country(query: str, api_key: str) -> str:
+    """Extract country name from user query"""
+    import aiohttp
+    headers = {
+        "x-api-key": api_key,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
+    }
+    
+    prompt = f"""
+    Extract the country name from this query: "{query}"
+    
+    Return ONLY the country name, nothing else.
+    If no country is mentioned, return "Unknown".
+    """
+    
+    data = {
+        "model": "claude-3-haiku-20240307",
+        "max_tokens": 50,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=data,
+            timeout=aiohttp.ClientTimeout(total=10)
+        ) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["content"][0]["text"].strip()
+    
+    # Fallback: try to extract from query
+    query_lower = query.lower()
+    if "japan" in query_lower:
+        return "Japan"
+    elif "france" in query_lower or "paris" in query_lower:
+        return "France"
+    elif "italy" in query_lower:
+        return "Italy"
+    elif "spain" in query_lower:
+        return "Spain"
+    elif "mexico" in query_lower:
+        return "Mexico"
+    elif "india" in query_lower:
+        return "India"
+    elif "china" in query_lower:
+        return "China"
+    elif "thailand" in query_lower:
+        return "Thailand"
+    elif "germany" in query_lower:
+        return "Germany"
+    
+    return query  # Use query as-is if no match
+
+@app.route('/api/voice/start-vapi', methods=['POST'])
+async def start_vapi_conversation():
+    """Start Vapi conversation with cultural context"""
+    try:
+        from integrations.vapi import VapiIntegration
+        
+        data = request.json
+        query = data.get('query', '')
+        
+        # Extract country from query
+        country = await _extract_country(query, ANTHROPIC_API_KEY)
+        
+        # Get cultural data for context
+        from agents import ContentFeedAgent
+        
+        content_feed = ContentFeedAgent(ANTHROPIC_API_KEY)
+        
+        # Generate cultural context with default interests
+        interests = ["news", "movies", "music", "food", "landmarks"]
+        
+        feed_result = await content_feed.process({
+            "country": country,
+            "interests": interests
+        })
+        
+        cards = feed_result.data.get("cards", []) if feed_result.status == "success" else []
+        
+        # Create Vapi assistant
+        vapi = VapiIntegration(VAPI_API_KEY)
+        
+        # Build system prompt with cultural context
+        system_prompt = f"You are a cultural assistant helping users learn about {country}. "
+        if cards:
+            system_prompt += "Here's some recent cultural content about " + country + ":\n\n"
+            for i, card in enumerate(cards[:5], 1):
+                if card.get('type') == 'news':
+                    system_prompt += f"{i}. News: {card.get('title', '')}\n"
+                elif card.get('type') == 'movie':
+                    system_prompt += f"{i}. Movie: {card.get('title', '')}\n"
+                elif card.get('type') == 'food':
+                    system_prompt += f"{i}. Restaurant: {card.get('restaurant_name', '')}\n"
+                elif card.get('type') == 'attraction':
+                    system_prompt += f"{i}. Attraction: {card.get('name', '')}\n"
+            system_prompt += "\nYou can discuss these topics and answer questions about the culture."
+        else:
+            system_prompt += "Answer questions about the culture, traditions, and current events."
+        
+        # Use country to determine voice accent for cultural authenticity
+        # But always start conversation in English
+        country_voice_map = {
+            "Spain": "es",
+            "France": "fr", 
+            "Japan": "ja",
+            "Italy": "it",
+            "Germany": "de",
+            "Mexico": "es"
+        }
+        
+        voice_language = country_voice_map.get(country, "en")  # Use country's native accent
+        conversation_language = "en"  # Always start in English
+        
+        assistant_result = await vapi.create_assistant(
+            name=f"{country} Cultural Assistant",
+            system_prompt=system_prompt,
+            language=voice_language  # Use voice language for accent
+        )
+        
+        # Extract the ID from the assistant object
+        assistant_id = assistant_result.get('id') if isinstance(assistant_result, dict) else assistant_result
+        
+        return jsonify({"assistant_id": assistant_id})
+        
+    except Exception as e:
+        logger.error(f"Error in start-vapi: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/vapi/key', methods=['GET'])
+def get_vapi_key():
+    """Get Vapi public key for frontend"""
+    vapi_public_key = os.getenv('VAPI_PUBLIC_KEY')
+    if not vapi_public_key:
+        return jsonify({"error": "VAPI_PUBLIC_KEY not configured"}), 500
+    return jsonify({"key": vapi_public_key})
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

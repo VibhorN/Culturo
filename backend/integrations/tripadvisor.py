@@ -187,11 +187,17 @@ class TripAdvisorIntegration:
     async def get_historical_landmarks(self, country: str, limit: int = 5) -> Optional[Dict]:
         """Get historical landmarks for a country using TripAdvisor"""
         try:
-            landmarks = self.get_popular_locations(
-                country=country,
-                category="attractions",
-                search_query="historical landmarks monuments",
-                limit=limit
+            # Run in thread pool since get_popular_locations is sync
+            import asyncio
+            loop = asyncio.get_event_loop()
+            landmarks = await loop.run_in_executor(
+                None,
+                lambda: self.get_popular_locations(
+                    country=country,
+                    category="attractions",
+                    search_query="historical landmarks monuments",
+                    limit=limit
+                )
             )
             
             if landmarks:
@@ -211,11 +217,17 @@ class TripAdvisorIntegration:
     async def get_popular_restaurants(self, country: str, limit: int = 5) -> Optional[Dict]:
         """Get popular restaurants for a country using TripAdvisor"""
         try:
-            restaurants = self.get_popular_locations(
-                country=country,
-                category="restaurants",
-                search_query="traditional local cuisine",
-                limit=limit
+            # Run in thread pool since get_popular_locations is sync
+            import asyncio
+            loop = asyncio.get_event_loop()
+            restaurants = await loop.run_in_executor(
+                None,
+                lambda: self.get_popular_locations(
+                    country=country,
+                    category="restaurants",
+                    search_query="traditional local cuisine",
+                    limit=limit
+                )
             )
             
             if restaurants:
@@ -235,11 +247,17 @@ class TripAdvisorIntegration:
     async def get_tourist_destinations(self, country: str, limit: int = 5) -> Optional[Dict]:
         """Get popular tourist destinations for a country using TripAdvisor"""
         try:
-            destinations = self.get_popular_locations(
-                country=country,
-                category="attractions",
-                search_query="must visit tourist attractions",
-                limit=limit
+            # Run in thread pool since get_popular_locations is sync
+            import asyncio
+            loop = asyncio.get_event_loop()
+            destinations = await loop.run_in_executor(
+                None,
+                lambda: self.get_popular_locations(
+                    country=country,
+                    category="attractions",
+                    search_query="must visit tourist attractions",
+                    limit=limit
+                )
             )
             
             if destinations:

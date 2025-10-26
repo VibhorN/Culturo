@@ -19,6 +19,8 @@ from .learning.vocabulary_builder import VocabularyBuilderAgent
 from .cultural_agents.cultural_etiquette import CulturalEtiquetteAgent
 from .analysis.progress_analytics import ProgressAnalyticsAgent
 from .cognitive.motivation_coach import MotivationCoachAgent
+from .content_feed import ContentFeedAgent
+from .trivia import TriviaAgent
 
 __all__ = [
     'OrchestratorAgent',
@@ -33,5 +35,7 @@ __all__ = [
     'VocabularyBuilderAgent',
     'CulturalEtiquetteAgent',
     'ProgressAnalyticsAgent',
-    'MotivationCoachAgent'
+    'MotivationCoachAgent',
+    'ContentFeedAgent',
+    'TriviaAgent'
 ]

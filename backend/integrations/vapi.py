@@ -264,12 +264,14 @@ Language code:"""
                 "Content-Type": "application/json"
             }
             
-            # Get language-specific voice configuration
+            # Get language-specific voice configuration (use country accent)
             voice_config = self.voice_configs.get(language, self.voice_configs["en"])
-            greeting = self.language_greetings.get(language, self.language_greetings["en"])
-            ending = self.language_endings.get(language, self.language_endings["en"])
             
-            logger.info(f"Using voice config for {language}: {voice_config['voiceId']}")
+            # Always use English greetings/endings, but country-specific voice
+            greeting = self.language_greetings.get("en")  # Always English greeting
+            ending = self.language_endings.get("en")  # Always English ending
+            
+            logger.info(f"Using voice config for {language}: {voice_config['voiceId']} (but greeting in English)")
             
             # Enhanced voice configuration for more natural speech
             voice_settings = {
@@ -281,11 +283,21 @@ Language code:"""
                 "useSpeakerBoost": voice_config["use_speaker_boost"]
             }
             
-            # Language-specific system prompt
-            language_system_prompt = f"You are a friendly cultural assistant speaking {language.upper()}. {system_prompt}"
+            # Language-specific system prompt with balanced brevity instructions and multi-language support
+            language_system_prompt = f"""You are a friendly cultural assistant helping users learn about different cultures. {system_prompt}
+
+IMPORTANT: 
+- Give concise but complete answers (2-4 sentences)
+- Always finish your thoughts completely
+- Respond in the SAME LANGUAGE the user speaks to you
+- If user speaks English, respond in English
+- If user speaks Spanish, respond in Spanish
+- If user speaks French, respond in French
+- Match the user's language automatically
+"""
             
             assistant_data = {
-                "name": f"{name} ({language.upper()})",
+                "name": f"{name}",
                 "model": {
                     "provider": "openai",
                     "model": "gpt-3.5-turbo",
@@ -295,8 +307,8 @@ Language code:"""
                             "content": language_system_prompt
                         }
                     ],
-                    "temperature": 0.7,  # More natural responses
-                    "maxTokens": 150
+                    "temperature": 0.6,  # Balanced responses
+                    "maxTokens": 200  # Allow longer responses to prevent cutoffs
                 },
                 "voice": voice_settings,
                 "firstMessage": greeting,
@@ -382,6 +394,31 @@ Language code:"""
                         
         except Exception as e:
             logger.error(f"Error creating VAPI call: {str(e)}")
+            return None
+    
+    async def get_phone_number(self, assistant_id):
+        """Get a phone number for the assistant to make calls"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Get available phone numbers
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/phone-number",
+                    headers=headers,
+                    params={"assistantId": assistant_id}
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result
+                    else:
+                        logger.error(f"Failed to get phone number: {response.status}")
+                        return None
+        except Exception as e:
+            logger.error(f"Error getting phone number: {str(e)}")
             return None
     
     async def synthesize_speech(self, text, voice="alloy", language="en"):
