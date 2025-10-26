@@ -386,129 +386,389 @@ const FloatingElement = styled(motion.div)`
 function App() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [currentUtterance, setCurrentUtterance] = useState(null);
+  const [currentAudio, setCurrentAudio] = useState(null);
   const [country, setCountry] = useState('');
   const [culturalData, setCulturalData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('Ready to explore cultures!');
   const [transcript, setTranscript] = useState('');
   
-  const recognitionRef = useRef(null);
-  const synthesisRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const audioRef = useRef(null);
+  const recordingStartTimeRef = useRef(null);
 
 
-  const handleVoiceInput = async (input) => {
-    setStatus('Processing your request...');
+  const handleVoiceInput = async (audioBlob) => {
+    setStatus('Transcribing audio...');
+    console.log('Sending audio to Deepgram:', audioBlob.size, 'bytes, type:', audioBlob.type);
     
-    // Check if it's a country-specific query
-    const countryMatch = input.match(/(?:about|teach me about|tell me about)\s+(\w+)/i);
-    const extractedCountry = countryMatch ? countryMatch[1] : null;
-    
-    if (extractedCountry) {
-      setCountry(extractedCountry);
-      await fetchCulturalData(extractedCountry);
-    } else {
-      // Handle as general query
-      await handleGeneralQuery(input);
+    try {
+      // Try multiple language settings for better Spanish recognition
+      const languageAttempts = [
+        { language: 'auto', description: 'auto-detect' },
+        { language: 'es', description: 'Spanish' },
+        { language: 'es-US', description: 'Spanish (US)' },
+        { language: 'es-ES', description: 'Spanish (Spain)' },
+        { language: 'en-US', description: 'English (fallback)' }
+      ];
+      
+      let lastError = null;
+      
+      for (const attempt of languageAttempts) {
+        try {
+          console.log(`Trying transcription with ${attempt.description}...`);
+          
+          const formData = new FormData();
+          let filename = 'audio.webm';
+          if (audioBlob.type.includes('mp4')) {
+            filename = 'audio.mp4';
+          } else if (audioBlob.type.includes('wav')) {
+            filename = 'audio.wav';
+          }
+          
+          formData.append('audio', audioBlob, filename);
+          formData.append('language', attempt.language);
+          
+          const response = await axios.post('http://localhost:5001/api/voice/transcribe', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: 30000,
+          });
+          
+          console.log(`Deepgram response (${attempt.description}):`, response.data);
+          
+          if (response.data.transcript && response.data.transcript.trim()) {
+            console.log(`✅ Success with ${attempt.description}:`, response.data.transcript);
+            const transcript = response.data.transcript;
+            setTranscript(transcript);
+            setStatus('Processing your request...');
+            
+            // Always send voice transcripts to the agentic system for intelligent processing
+            await handleGeneralQuery(transcript, true);
+            return; // Success, exit the function
+          } else if (response.data.error) {
+            lastError = new Error(response.data.error);
+            console.log(`❌ ${attempt.description} failed:`, response.data.error);
+          }
+        } catch (error) {
+          lastError = error;
+          console.log(`❌ ${attempt.description} failed:`, error.message);
+        }
+      }
+      
+      // If all attempts failed, throw the last error
+      throw lastError || new Error('All language attempts failed');
+      
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      setStatus('Error transcribing audio. Please try again.');
+      toast.error('Failed to transcribe audio: ' + (error.response?.data?.error || error.message));
     }
   };
 
   useEffect(() => {
-    // Initialize speech recognition
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onstart = () => {
-        setIsListening(true);
-        setStatus('Listening... Speak now!');
-      };
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
+    // Initialize audio recording
+    const initializeAudioRecording = async () => {
+      try {
+        // Try to get the best possible audio quality with fallback options
+        const audioConstraints = {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000, // Higher sample rate for better quality
+          channelCount: 1, // Mono for better speech recognition
+          latency: 0.01 // Low latency
+        };
         
-        setTranscript(transcript);
+        console.log('Requesting audio with constraints:', audioConstraints);
         
-        if (event.results[0].isFinal) {
-          handleVoiceInput(transcript);
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: audioConstraints
+          });
+        } catch (error) {
+          console.warn('Failed with high-quality constraints, trying basic constraints:', error);
+          // Fallback to basic constraints
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true
+          });
         }
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setStatus('Speech recognition error. Please try again.');
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-        setStatus('Processing your request...');
-      };
-    }
-
-    // Initialize speech synthesis
-    synthesisRef.current = window.speechSynthesis;
-  }, [handleVoiceInput]);
+        
+        console.log('Audio stream obtained:', stream.getAudioTracks()[0].getSettings());
+        
+        // Try multiple audio formats for better compatibility
+        let options = {};
+        
+        // Try different formats in order of preference
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          options = { 
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000
+          };
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          options = { 
+            mimeType: 'audio/webm',
+            audioBitsPerSecond: 128000
+          };
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          options = { 
+            mimeType: 'audio/mp4',
+            audioBitsPerSecond: 128000
+          };
+        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+          options = { 
+            mimeType: 'audio/wav',
+            audioBitsPerSecond: 128000
+          };
+        } else {
+          // Fallback to default
+          options = {};
+        }
+        
+        console.log('Using MediaRecorder options:', options);
+        
+        const mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorderRef.current = mediaRecorder;
+        
+        mediaRecorder.ondataavailable = (event) => {
+          console.log('Audio data available:', event.data.size, 'bytes');
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          } else {
+            console.warn('Empty audio chunk received');
+          }
+        };
+        
+        mediaRecorder.onstop = async () => {
+          console.log('Recording stopped, processing audio...');
+          const audioBlob = new Blob(audioChunksRef.current, { 
+            type: mediaRecorder.mimeType || 'audio/webm' 
+          });
+          audioChunksRef.current = [];
+          
+          console.log('Audio blob created:', audioBlob.size, 'bytes, type:', audioBlob.type);
+          console.log('MediaRecorder mimeType:', mediaRecorder.mimeType);
+          console.log('Audio track settings:', stream.getAudioTracks()[0].getSettings());
+          
+          if (audioBlob.size > 1000) { // Require at least 1KB of audio data
+            await handleVoiceInput(audioBlob);
+          } else {
+            console.error('Insufficient audio data recorded:', audioBlob.size, 'bytes');
+            setStatus('No audio detected. Please speak louder and try again.');
+            toast.error('No audio detected. Please speak louder and try again.');
+          }
+        };
+        
+        mediaRecorder.onerror = (event) => {
+          console.error('MediaRecorder error:', event.error);
+          setStatus('Recording error. Please try again.');
+          toast.error('Recording error occurred');
+        };
+        
+        console.log('Audio recording initialized successfully');
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+        setStatus('Microphone access denied. Please allow microphone access.');
+        toast.error('Microphone access denied. Please allow microphone access.');
+      }
+    };
+    
+    initializeAudioRecording();
+    
+    // Cleanup on unmount
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
 
   const startListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.start();
+    console.log('Starting recording...');
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state === 'inactive') {
+        audioChunksRef.current = [];
+        try {
+          recordingStartTimeRef.current = Date.now();
+          mediaRecorderRef.current.start(250); // Collect data every 250ms for better chunks
+          setIsListening(true);
+          setStatus('Listening... Speak now!');
+          console.log('Recording started successfully');
+          
+          // Show helpful tip for Spanish speakers
+          if (navigator.language.startsWith('es') || window.location.search.includes('lang=es')) {
+            toast.info('💡 Tip: Speak clearly and at normal pace for better Spanish recognition');
+          }
+        } catch (error) {
+          console.error('Error starting recording:', error);
+          setStatus('Error starting recording. Please try again.');
+          toast.error('Failed to start recording');
+        }
+      } else {
+        console.log('Recorder already active, state:', mediaRecorderRef.current.state);
+        setStatus('Already recording...');
+      }
     } else {
-      toast.error('Speech recognition not supported in this browser');
+      console.error('MediaRecorder not initialized');
+      setStatus('Audio recording not available');
+      toast.error('Audio recording not available. Please refresh the page.');
     }
   };
 
   const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
+    console.log('Stopping recording...');
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      try {
+        // Ensure minimum recording duration for better speech recognition
+        const recordingDuration = Date.now() - (recordingStartTimeRef.current || Date.now());
+        if (recordingDuration < 1000) { // Less than 1 second
+          console.log('Recording too short, waiting for minimum duration...');
+          setTimeout(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              mediaRecorderRef.current.stop();
+              setIsListening(false);
+              setStatus('Processing your request...');
+              console.log('Recording stopped successfully');
+            }
+          }, 1000 - recordingDuration);
+        } else {
+          mediaRecorderRef.current.stop();
+          setIsListening(false);
+          setStatus('Processing your request...');
+          console.log('Recording stopped successfully');
+        }
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+        setIsListening(false);
+        setStatus('Error stopping recording');
+        toast.error('Failed to stop recording');
+      }
+    } else {
+      console.log('No active recording to stop');
+      setIsListening(false);
+      setStatus('Ready to explore cultures!');
     }
   };
 
-  const speak = (text) => {
-    if (synthesisRef.current) {
-      // Stop any current speech
-      if (currentUtterance) {
-        synthesisRef.current.cancel();
+  const speak = async (text) => {
+    try {
+      setStatus('Generating speech...');
+      
+      // Stop any current audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
       }
       
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 0.8;
+      // Send text to VAPI for synthesis
+      const response = await axios.post('http://localhost:5001/api/voice/synthesize', {
+        text: text,
+        voice: 'alloy',
+        language: 'en'
+      });
       
-      utterance.onstart = () => {
-        setIsSpeaking(true);
-        setCurrentUtterance(utterance);
-      };
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        setCurrentUtterance(null);
-      };
-      utterance.onerror = () => {
-        setIsSpeaking(false);
-        setCurrentUtterance(null);
-      };
-      
-      synthesisRef.current.speak(utterance);
+      if (response.data.audio_url) {
+        // Create audio element and play
+        const audio = new Audio(response.data.audio_url);
+        audioRef.current = audio;
+        
+        audio.onloadstart = () => {
+          setIsSpeaking(true);
+          setStatus('Speaking...');
+        };
+        
+        audio.onended = () => {
+          setIsSpeaking(false);
+          setStatus('Ready to explore cultures!');
+        };
+        
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          setStatus('Error playing audio');
+          toast.error('Failed to play audio');
+        };
+        
+        await audio.play();
+      } else if (response.data.vapi_call) {
+        // VAPI created a voice assistant
+        console.log('VAPI voice assistant created:', response.data.assistant_id);
+        setStatus('Voice assistant created! Check the VAPI dashboard.');
+        toast.success('Voice assistant created with VAPI!');
+        
+        // Open VAPI dashboard in new tab
+        if (response.data.assistant_url) {
+          window.open(response.data.assistant_url, '_blank');
+        }
+        
+        // Fallback to browser speech synthesis for immediate feedback
+        if (response.data.text) {
+          await speakWithBrowser(response.data.text);
+        }
+      } else if (response.data.fallback_to_browser) {
+        // Fallback to browser speech synthesis
+        console.log('VAPI failed, using browser speech synthesis');
+        await speakWithBrowser(response.data.text);
+      } else {
+        throw new Error('No audio URL received');
+      }
+    } catch (error) {
+      console.error('Error synthesizing speech:', error);
+      setIsSpeaking(false);
+      setStatus('Error generating speech');
+      toast.error('Failed to generate speech');
     }
   };
 
   const stopSpeaking = () => {
-    if (synthesisRef.current && currentUtterance) {
-      synthesisRef.current.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       setIsSpeaking(false);
-      setCurrentUtterance(null);
+      setStatus('Ready to explore cultures!');
     }
   };
 
-  const handleGeneralQuery = async (query) => {
+  const speakWithBrowser = (text) => {
+    return new Promise((resolve, reject) => {
+      if ('speechSynthesis' in window) {
+        // Stop any current speech
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
+        
+        utterance.onstart = () => {
+          setIsSpeaking(true);
+          setStatus('Speaking...');
+        };
+        
+        utterance.onend = () => {
+          setIsSpeaking(false);
+          setStatus('Ready to explore cultures!');
+          resolve();
+        };
+        
+        utterance.onerror = (event) => {
+          setIsSpeaking(false);
+          setStatus('Error with speech synthesis');
+          console.error('Speech synthesis error:', event.error);
+          reject(event.error);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      } else {
+        reject(new Error('Speech synthesis not supported'));
+      }
+    });
+  };
+
+  const handleGeneralQuery = async (query, isVoiceInput = false) => {
     setLoading(true);
     setStatus('Processing your request...');
     
@@ -516,7 +776,13 @@ function App() {
       const response = await axios.post('http://localhost:5001/api/agent/process', {
         user_id: 'test',
         query: query,
-        language: 'en'
+        language: 'en',
+        input_type: isVoiceInput ? 'voice' : 'text',
+        audio_confidence: isVoiceInput ? 0.8 : 1.0, // Voice input might have lower confidence
+        session_data: {
+          previous_interactions: culturalData ? [culturalData.response] : [],
+          current_context: 'cultural_learning'
+        }
       });
       
       if (response.data.status === 'success' || response.data.status === 'clarification_needed') {
@@ -529,7 +795,7 @@ function App() {
         });
         
         // Speak the response
-        speak(response.data.response);
+        await speak(response.data.response);
         
         setStatus('Response ready!');
         toast.success('Got your response!');
@@ -545,71 +811,7 @@ function App() {
     }
   };
 
-  const fetchCulturalData = async (countryName) => {
-    setLoading(true);
-    setStatus(`Gathering cultural data for ${countryName}...`);
-    
-    try {
-      const response = await axios.post('http://localhost:5001/api/agent/process', {
-        user_id: 'test',
-        query: `Tell me about ${countryName}`,
-        language: 'en'
-      });
-      
-      if (response.data.status === 'success' || response.data.status === 'clarification_needed') {
-        // Set the response as cultural data for display
-        setCulturalData({
-          country: countryName,
-          response: response.data.response,
-          metadata: response.data.metadata
-        });
-        
-        // Generate and speak cultural summary
-        const summary = response.data.response;
-        speak(summary);
-        
-        setStatus(`Cultural immersion complete for ${countryName}!`);
-        toast.success(`Cultural data loaded for ${countryName}!`);
-      } else {
-        throw new Error(response.data.response || 'Failed to get cultural data');
-      }
-    } catch (error) {
-      console.error('Error fetching cultural data:', error);
-      setStatus('Error loading cultural data. Please try again.');
-      toast.error('Failed to load cultural data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const generateCulturalSummary = (data) => {
-    if (!data) return 'No cultural data available.';
-    
-    const country = data.country || 'this country';
-    let summary = `Welcome to ${country}! `;
-    
-    if (data.government) {
-      summary += `The government is ${data.government.title}. `;
-    }
-    
-    if (data.food && data.food.popular_foods) {
-      summary += `Popular foods include ${data.food.popular_foods.slice(0, 3).join(', ')}. `;
-    }
-    
-    if (data.slang && data.slang.slang_expressions) {
-      const firstSlang = data.slang.slang_expressions[0];
-      if (firstSlang) {
-        summary += `A common expression is ${firstSlang.term}, which means ${firstSlang.meaning}. `;
-      }
-    }
-    
-    if (data.festivals && data.festivals.major_festivals) {
-      summary += `Major festivals include ${data.festivals.major_festivals.slice(0, 2).join(' and ')}. `;
-    }
-    
-    summary += 'Enjoy your cultural journey!';
-    return summary;
-  };
 
   const handleCountrySubmit = (e) => {
     e.preventDefault();
@@ -618,7 +820,7 @@ function App() {
     if (country.trim()) {
       console.log('💬 Calling handleGeneralQuery for:', country.trim());
       // Let the LLM handle all queries - it's smart enough to recognize countries and intents
-      handleGeneralQuery(country.trim());
+      handleGeneralQuery(country.trim(), false); // false indicates this is text input
     }
   };
 
@@ -719,6 +921,22 @@ function App() {
           {status}
         </StatusText>
 
+        {/* Debug info for Spanish speech recognition */}
+        {process.env.NODE_ENV === 'development' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{ 
+              color: 'rgba(255, 255, 255, 0.6)', 
+              textAlign: 'center', 
+              marginBottom: '1rem',
+              fontSize: '0.8rem'
+            }}
+          >
+            💡 Tip: Speak clearly and hold the microphone button for at least 1 second
+          </motion.div>
+        )}
+
         {transcript && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -732,7 +950,7 @@ function App() {
         <form onSubmit={handleCountrySubmit}>
           <CountryInput
             type="text"
-            placeholder="🌍 Ask me anything... 'Who are you?', 'Tell me about Japan', 'How are you?'"
+            placeholder="🌍 Ask me anything... 'Who are you?', 'Tell me about Japan', 'Cuéntame sobre España', 'How are you?'"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
             initial={{ opacity: 0 }}
