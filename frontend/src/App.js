@@ -443,8 +443,8 @@ function App() {
             console.log(`✅ Success with ${attempt.description}:`, response.data.transcript);
             const transcript = response.data.transcript;
             setTranscript(transcript);
-            setStatus('Processing your request...');
-            
+    setStatus('Processing your request...');
+    
             // Always send voice transcripts to the agentic system for intelligent processing
             await handleGeneralQuery(transcript, true);
             return; // Success, exit the function
@@ -608,7 +608,7 @@ function App() {
           setStatus('Error starting recording. Please try again.');
           toast.error('Failed to start recording');
         }
-      } else {
+    } else {
         console.log('Recorder already active, state:', mediaRecorderRef.current.state);
         setStatus('Already recording...');
       }
@@ -805,11 +805,11 @@ function App() {
       if ('speechSynthesis' in window) {
         // Stop any current speech
         window.speechSynthesis.cancel();
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.9;
-        utterance.pitch = 1;
-        utterance.volume = 0.8;
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
         
         // Detect language and set appropriate voice
         const detectedLanguage = detectLanguageFromText(text);
@@ -861,20 +861,20 @@ function App() {
           utterance.lang = selectedVoice.lang;
           console.log(`Selected voice: ${selectedVoice.name} (${selectedVoice.lang})`);
         }
-        
-        utterance.onstart = () => {
-          setIsSpeaking(true);
+      
+      utterance.onstart = () => {
+        setIsSpeaking(true);
           setStatus('Speaking...');
-        };
+      };
         
-        utterance.onend = () => {
-          setIsSpeaking(false);
+      utterance.onend = () => {
+        setIsSpeaking(false);
           setStatus('Ready to explore cultures!');
           resolve();
-        };
+      };
         
         utterance.onerror = (event) => {
-          setIsSpeaking(false);
+        setIsSpeaking(false);
           setStatus('Error with speech synthesis');
           console.error('Speech synthesis error:', event.error);
           reject(event.error);

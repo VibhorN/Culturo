@@ -1,3 +1,6 @@
+# Phoenix tracing MUST be imported FIRST, before any LLM calls
+from integrations.arize_phoenix_tracing import tracer_provider, log_agent_evaluation as log_to_phoenix
+
 import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -52,15 +55,8 @@ try:
 except ImportError:
     anthropic_client = None
 
-# Initialize Arize Agent Evaluations Project
-try:
-    from integrations.arize_agent_evaluations import arize_agent_evaluations
-    if arize_agent_evaluations.enabled:
-        logger.info("Arize Agent Evaluations Project initialized successfully")
-    else:
-        logger.warning("Arize Agent Evaluations Project not enabled")
-except Exception as e:
-    logger.warning(f"Failed to initialize Arize Agent Evaluations Project: {str(e)}")
+# Phoenix tracing is initialized via import at top of this file
+logger.info("✅ Phoenix tracing available for LLM observability")
 
 # Initialize Agent Orchestrator with Anthropic API
 try:

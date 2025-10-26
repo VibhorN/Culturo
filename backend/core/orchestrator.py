@@ -22,7 +22,7 @@ from agents.learning.vocabulary_builder import VocabularyBuilderAgent
 from agents.cultural_agents.cultural_etiquette import CulturalEtiquetteAgent
 from agents.analysis.progress_analytics import ProgressAnalyticsAgent
 from agents.cognitive.motivation_coach import MotivationCoachAgent
-from integrations.arize_agent_evaluations import log_query_evaluation # New import for Arize Agent Evaluations Project
+# Phoenix tracing is now used instead of old Arize SDK
 
 logger = logging.getLogger(__name__)
 
@@ -90,10 +90,11 @@ class AgentOrchestrator:
         if len(self.conversation_context[user_id]["conversation_history"]) > 10:
             self.conversation_context[user_id]["conversation_history"] = self.conversation_context[user_id]["conversation_history"][-10:]
     
-    async def _log_to_simplified_arize(self, user_id: str, user_input: Dict, 
+    async def _log_to_phoenix(self, user_id: str, user_input: Dict, 
                                      final_response: Dict, agent_responses: Dict, 
                                      agents_activated: List[str]):
-        """Log query evaluation to simplified Arize integration"""
+        """Log query evaluation to Phoenix"""
+        logger.info(f"[Phoenix] Starting logging for user {user_id}")
         try:
             # Prepare agents_used data for logging
             agents_used = {}
@@ -121,17 +122,21 @@ class AgentOrchestrator:
                 except:
                     logger.warning("No Anthropic client available for evaluations")
             
-            # Log to simplified Arize
-            await log_query_evaluation(
-                user_id=user_id,
-                question=user_input.get('query', ''),
-                response=final_response.get('response', ''),
-                agents_used=agents_used,
-                anthropic_client=anthropic_client
-            )
+            # Log to Phoenix for structured data (ONE row with agent scores and reasoning)
+            try:
+                from integrations.arize_phoenix_tracing import log_agent_evaluation
+                await log_agent_evaluation(
+                    user_id=user_id,
+                    question=user_input.get('query', ''),
+                    response=final_response.get('response', ''),
+                    agents_used=agents_used,
+                    anthropic_client=anthropic_client
+                )
+            except Exception as phoenix_error:
+                logger.error(f"Failed to log to Phoenix: {str(phoenix_error)}")
             
         except Exception as e:
-            logger.error(f"Failed to log to simplified Arize: {str(e)}")
+            logger.error(f"Failed to log to Phoenix: {str(e)}")
     
     async def process_input(self, user_input: Dict) -> Dict:
         """
@@ -358,7 +363,7 @@ class AgentOrchestrator:
             self._update_user_context(user_id, execution_plan, final_response["response"])
             
             # Log to simplified Arize integration
-            await self._log_to_simplified_arize(
+            await self._log_to_phoenix(
                 user_id, user_input, final_response, agent_responses, agents_activated
             )
             
