@@ -45,15 +45,15 @@ const OptionsList = styled.div`
 
 const OptionButton = styled.button`
   background: ${props => 
-    props.selected && props.correct 
+    props.$selected && props.$correct 
       ? 'rgba(76, 175, 80, 0.3)' 
-      : props.selected && !props.correct
+      : props.$selected && !props.$correct
       ? 'rgba(244, 67, 54, 0.3)'
       : 'rgba(255, 255, 255, 0.1)'};
   border: 2px solid ${props => 
-    props.selected && props.correct
+    props.$selected && props.$correct
       ? '#4caf50'
-      : props.selected && !props.correct
+      : props.$selected && !props.$correct
       ? '#f44336'
       : 'rgba(255, 255, 255, 0.2)'};
   border-radius: 0.75rem;
@@ -186,10 +186,10 @@ function TriviaPanel({ questions, country }) {
       <TrophyIcon />
       <CompletionTitle>Congratulations! 🎉</CompletionTitle>
       <CompletionMessage>
-        You've completed the daily cultural quiz for {country}!
+        You've completed today's daily cultural quiz for {country}!
       </CompletionMessage>
       <CompletionMessage style={{ fontSize: '1rem', marginTop: '1rem' }}>
-        You answered all 25 questions correctly.
+        You answered all questions correctly. Great work!
       </CompletionMessage>
     </CompletionScreen>
     );
@@ -271,9 +271,9 @@ function TriviaPanel({ questions, country }) {
                   key={index}
                   onClick={() => handleAnswerSelect(index)}
                   disabled={showFeedback}
-                  selected={isSelected}
-                  correct={isCorrect}
-                  showFeedback={showFeedback}
+                  $selected={isSelected}
+                  $correct={isCorrect}
+                  $showFeedback={showFeedback}
                 >
                   <OptionLetter>
                     {String.fromCharCode(65 + index)}

@@ -15,21 +15,21 @@ const Container = styled(motion.div)`
 const IconContainer = styled.div`
   width: 120px;
   height: 120px;
-  background: ${props => props.isActive 
+  background: ${props => props.$isActive 
     ? 'radial-gradient(circle, rgba(76, 175, 80, 0.3) 0%, rgba(76, 175, 80, 0.1) 100%)'
     : 'rgba(255, 255, 255, 0.1)'};
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: ${props => props.isActive ? '3px solid #4CAF50' : '2px solid rgba(255, 255, 255, 0.2)'};
+  border: ${props => props.$isActive ? '3px solid #4CAF50' : '2px solid rgba(255, 255, 255, 0.2)'};
   cursor: pointer;
   transition: all 0.3s ease;
-  animation: ${props => props.isActive ? 'pulse 2s infinite' : 'none'};
+  animation: ${props => props.$isActive ? 'pulse 2s infinite' : 'none'};
   position: relative;
 
   &:hover {
-    background: ${props => props.isActive
+    background: ${props => props.$isActive
       ? 'radial-gradient(circle, rgba(76, 175, 80, 0.4) 0%, rgba(76, 175, 80, 0.2) 100%)'
       : 'rgba(255, 255, 255, 0.15)'};
     transform: scale(1.05);
@@ -56,7 +56,7 @@ const Description = styled.div`
 `;
 
 const StatusText = styled.div`
-  color: ${props => props.isActive ? '#4CAF50' : 'rgba(255, 255, 255, 0.8)'};
+  color: ${props => props.$isActive ? '#4CAF50' : 'rgba(255, 255, 255, 0.8)'};
   font-size: 0.85rem;
   font-weight: 600;
   text-align: center;
@@ -354,14 +354,14 @@ function VoiceBoxPlaceholder({ country = null }) {
           transition={{ duration: 2, repeat: Infinity }}
         />
       )}
-      <IconContainer onClick={handleClick} isActive={isConnected}>
+      <IconContainer onClick={handleClick} $isActive={isConnected}>
         {isConnected ? <PhoneOff size={48} color="white" /> : <Phone size={48} color="white" />}
       </IconContainer>
       <Label>Voice Assistant</Label>
       <Description>
         {country ? `Discuss ${country}'s culture` : 'Cultural conversation'}
       </Description>
-      <StatusText isActive={isConnected}>{status}</StatusText>
+      <StatusText $isActive={isConnected}>{status}</StatusText>
       {error && (
         <StatusText style={{ color: '#ff6b6b', fontSize: '0.75rem' }}>
           {error}

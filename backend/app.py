@@ -608,7 +608,7 @@ async def orchestrate():
         
         # Step 3: Generate trivia
         trivia_result = await trivia.process({
-            "cards": cards,
+            "content_cards": cards,  # Fixed: TriviaAgent expects "content_cards"
             "country": country
         })
         
@@ -617,7 +617,7 @@ async def orchestrate():
         return jsonify({
             "country": country,
             "feed": cards,
-            "trivia": questions,
+            "triviaQuestions": questions,  # Changed from "trivia" to match frontend expectation
             "interests": interests
         })
         
@@ -765,6 +765,42 @@ def get_vapi_key():
     if not vapi_public_key:
         return jsonify({"error": "VAPI_PUBLIC_KEY not configured"}), 500
     return jsonify({"key": vapi_public_key})
+
+@app.route('/api/trivia', methods=['POST'])
+def trivia_endpoint():
+    """Cultural trivia agent endpoint using Letta - country-specific questions"""
+    try:
+        data = request.get_json()
+        action = data.get('action', 'start')
+        user_id = data.get('user_id', 'anonymous')
+        country = data.get('country')  # Get country for cultural context
+        
+        # Import cultural trivia agent
+        try:
+            from integrations.letta_trivia import cultural_trivia_agent
+            
+            result = cultural_trivia_agent.process({
+                'action': action,
+                'user_id': user_id,
+                'agent_id': data.get('agent_id'),
+                'answer': data.get('answer', ''),
+                'country': country  # Pass country for cultural context
+            })
+            
+            return jsonify(result)
+            
+        except ImportError:
+            return jsonify({
+                "status": "error",
+                "response": "Cultural trivia agent not available. Please install Letta SDK."
+            }), 503
+            
+    except Exception as e:
+        logger.error(f"Error in trivia endpoint: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "response": f"Failed to process trivia request: {str(e)}"
+        }), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
