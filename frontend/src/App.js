@@ -654,6 +654,44 @@ function App() {
     }
   };
 
+  // Language detection function
+  const detectLanguageFromText = (text) => {
+    const textLower = text.toLowerCase();
+    
+    // Spanish indicators
+    const spanishWords = ['hola', 'gracias', 'por favor', 'adiós', 'sí', 'no', 'cómo', 'qué', 'dónde', 'cuándo', 'español', 'cultura', 'país'];
+    const spanishChars = ['ñ', 'á', 'é', 'í', 'ó', 'ú', 'ü'];
+    
+    // French indicators
+    const frenchWords = ['bonjour', 'merci', 's\'il vous plaît', 'au revoir', 'oui', 'non', 'comment', 'où', 'quand', 'français', 'culture', 'pays'];
+    const frenchChars = ['à', 'è', 'é', 'ê', 'ë', 'î', 'ï', 'ô', 'ù', 'û', 'ü', 'ÿ', 'ç'];
+    
+    // German indicators
+    const germanWords = ['hallo', 'danke', 'bitte', 'auf wiedersehen', 'ja', 'nein', 'wie', 'wo', 'wann', 'deutsch', 'kultur', 'land'];
+    const germanChars = ['ä', 'ö', 'ü', 'ß'];
+    
+    // Italian indicators
+    const italianWords = ['ciao', 'grazie', 'prego', 'arrivederci', 'sì', 'no', 'come', 'dove', 'quando', 'italiano', 'cultura', 'paese'];
+    
+    // Portuguese indicators
+    const portugueseWords = ['olá', 'obrigado', 'por favor', 'tchau', 'sim', 'não', 'como', 'onde', 'quando', 'português', 'cultura', 'país'];
+    
+    // Check for language indicators
+    if (spanishWords.some(word => textLower.includes(word)) || spanishChars.some(char => text.includes(char))) {
+      return 'es';
+    } else if (frenchWords.some(word => textLower.includes(word)) || frenchChars.some(char => text.includes(char))) {
+      return 'fr';
+    } else if (germanWords.some(word => textLower.includes(word)) || germanChars.some(char => text.includes(char))) {
+      return 'de';
+    } else if (italianWords.some(word => textLower.includes(word))) {
+      return 'it';
+    } else if (portugueseWords.some(word => textLower.includes(word))) {
+      return 'pt';
+    } else {
+      return 'en'; // Default to English
+    }
+  };
+
   const speak = async (text) => {
     try {
       setStatus('Generating speech...');
@@ -664,12 +702,26 @@ function App() {
         audioRef.current.currentTime = 0;
       }
       
-      // Send text to VAPI for synthesis
+      // Validate text input
+      if (!text || !text.trim()) {
+        console.error('Empty text provided for speech synthesis');
+        setStatus('Error: No text to speak');
+        toast.error('No text provided for speech synthesis');
+        return;
+      }
+      
+      // Let the backend LLM detect the language automatically
+      console.log('Using LLM-based language detection for speech synthesis');
+      console.log(`Synthesizing text: "${text.substring(0, 100)}..."`);
+      
+      // Send text to VAPI for synthesis with auto language detection
       const response = await axios.post('http://localhost:5001/api/voice/synthesize', {
         text: text,
         voice: 'alloy',
-        language: 'en'
+        language: 'auto'  // Let the backend LLM detect the language
       });
+      
+      console.log('Speech synthesis response:', response.data);
       
       if (response.data.audio_url) {
         // Create audio element and play
@@ -719,7 +771,23 @@ function App() {
       console.error('Error synthesizing speech:', error);
       setIsSpeaking(false);
       setStatus('Error generating speech');
-      toast.error('Failed to generate speech');
+      
+      // Check if it's a fallback response
+      if (error.response?.data?.fallback_to_browser && error.response.data.text) {
+        console.log('Using fallback browser speech synthesis');
+        await speakWithBrowser(error.response.data.text);
+        return;
+      }
+      
+      // Show user-friendly error message
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to generate speech';
+      toast.error(`Speech synthesis failed: ${errorMessage}`);
+      
+      // Try browser fallback as last resort
+      if (text) {
+        console.log('Attempting browser speech synthesis as last resort');
+        await speakWithBrowser(text);
+      }
     }
   };
 
@@ -742,6 +810,57 @@ function App() {
         utterance.rate = 0.9;
         utterance.pitch = 1;
         utterance.volume = 0.8;
+        
+        // Detect language and set appropriate voice
+        const detectedLanguage = detectLanguageFromText(text);
+        console.log(`Using browser TTS for language: ${detectedLanguage}`);
+        
+        // Get available voices
+        const voices = window.speechSynthesis.getVoices();
+        
+        // Try to find a voice for the detected language
+        let selectedVoice = null;
+        if (detectedLanguage === 'es') {
+          selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('es') || 
+            voice.name.toLowerCase().includes('spanish') ||
+            voice.name.toLowerCase().includes('mexican')
+          );
+        } else if (detectedLanguage === 'fr') {
+          selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('fr') || 
+            voice.name.toLowerCase().includes('french')
+          );
+        } else if (detectedLanguage === 'de') {
+          selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('de') || 
+            voice.name.toLowerCase().includes('german')
+          );
+        } else if (detectedLanguage === 'it') {
+          selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('it') || 
+            voice.name.toLowerCase().includes('italian')
+          );
+        } else if (detectedLanguage === 'pt') {
+          selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('pt') || 
+            voice.name.toLowerCase().includes('portuguese')
+          );
+        }
+        
+        // Fallback to English voice
+        if (!selectedVoice) {
+          selectedVoice = voices.find(voice => 
+            voice.lang.startsWith('en') || 
+            voice.name.toLowerCase().includes('english')
+          );
+        }
+        
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+          utterance.lang = selectedVoice.lang;
+          console.log(`Selected voice: ${selectedVoice.name} (${selectedVoice.lang})`);
+        }
         
         utterance.onstart = () => {
           setIsSpeaking(true);

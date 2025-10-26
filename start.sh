@@ -5,6 +5,19 @@
 
 echo "🌍 Starting WorldWise..."
 
+# Function to kill processes on specific ports
+kill_port() {
+    local port=$1
+    local pids=$(lsof -ti:$port 2>/dev/null)
+    if [ ! -z "$pids" ]; then
+        echo "🛑 Killing processes on port $port (PIDs: $pids)"
+        kill -9 $pids 2>/dev/null
+        sleep 1
+    else
+        echo "✅ Port $port is free"
+    fi
+}
+
 # Function to kill background processes on exit
 cleanup() {
     echo ""
@@ -16,10 +29,18 @@ cleanup() {
 # Set up signal handlers
 trap cleanup SIGINT SIGTERM
 
+# Kill any existing processes on our ports
+echo "🔍 Checking for existing processes..."
+kill_port 3000  # Frontend port
+kill_port 5001  # Backend port
+
+echo ""
+echo "🚀 Starting fresh servers..."
+
 # Start backend
 echo "🚀 Starting backend server..."
 cd backend
-.venv/bin/python3 app.py &
+python3 app.py &
 BACKEND_PID=$!
 cd ..
 

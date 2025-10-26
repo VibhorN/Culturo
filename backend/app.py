@@ -351,25 +351,61 @@ async def transcribe_audio():
 async def synthesize_speech():
     """Synthesize speech using Vapi"""
     try:
+        logger.info("Starting speech synthesis request")
+        
+        # Check if VAPI is configured
         if not vapi:
+            logger.error("VAPI API key not configured")
             return jsonify({"error": "Vapi API key not configured"}), 500
         
+        # Validate request data
         data = request.get_json()
+        if not data:
+            logger.error("No JSON data provided")
+            return jsonify({"error": "No JSON data provided"}), 400
+        
         text = data.get('text', '')
         language = data.get('language', 'en')
         voice = data.get('voice', 'alloy')
         
+        # Validate text input
+        if not text or not text.strip():
+            logger.error("Empty text provided for synthesis")
+            return jsonify({"error": "Text is required for speech synthesis"}), 400
+        
+        logger.info(f"Synthesizing speech: text='{text[:50]}...', language='{language}', voice='{voice}'")
+        
         # Synthesize using Vapi
-        result = await vapi.synthesize_speech(text, voice, language)
+        try:
+            result = await vapi.synthesize_speech(text, voice, language)
+        except Exception as vapi_error:
+            logger.error(f"VAPI synthesis error: {str(vapi_error)}")
+            return jsonify({
+                "error": "Speech synthesis failed", 
+                "details": str(vapi_error),
+                "fallback_to_browser": True,
+                "text": text
+            }), 500
         
         if result:
+            logger.info(f"Speech synthesis successful: {result.get('message', 'Unknown')}")
             return jsonify(result)
         else:
-            return jsonify({"error": "Speech synthesis failed"}), 500
+            logger.error("VAPI returned None result")
+            return jsonify({
+                "error": "Speech synthesis failed - no result from VAPI",
+                "fallback_to_browser": True,
+                "text": text
+            }), 500
         
     except Exception as e:
-        logger.error(f"Error in speech synthesis: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Unexpected error in speech synthesis: {str(e)}", exc_info=True)
+        return jsonify({
+            "error": "Internal server error during speech synthesis",
+            "details": str(e),
+            "fallback_to_browser": True,
+            "text": data.get('text', '') if 'data' in locals() else ''
+        }), 500
 
 @app.route('/api/claude/reason', methods=['POST'])
 async def claude_reasoning():
