@@ -15,19 +15,19 @@ class DeepgramIntegration:
         self.api_key = api_key
         self.base_url = "https://api.deepgram.com/v1"
     
-    async def transcribe_audio(self, audio_data, language="en-US"):
+    async def transcribe_audio(self, audio_data, language="en-US", content_type="audio/webm"):
         """Transcribe audio using Deepgram API"""
         try:
             headers = {
                 "Authorization": f"Token {self.api_key}",
-                "Content-Type": "audio/wav"
+                "Content-Type": content_type
             }
             
             params = {
                 "model": "nova-2",
                 "language": language,
-                "punctuate": True,
-                "diarize": False
+                "punctuate": "true",
+                "diarize": "false"
             }
             
             async with aiohttp.ClientSession() as session:
@@ -75,22 +75,45 @@ class VapiIntegration:
                 "pitch": 1.0
             }
             
+            # Try different possible endpoints
+            endpoints = [
+                f"{self.base_url}/voice/synthesize",
+                f"{self.base_url}/v1/voice/synthesize", 
+                f"{self.base_url}/api/voice/synthesize",
+                f"{self.base_url}/synthesize"
+            ]
+            
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/voice/synthesize",
-                    headers=headers,
-                    json=data
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        return {
-                            "audio_url": result.get("audio_url"),
-                            "duration": result.get("duration"),
-                            "language": language
-                        }
-                    else:
-                        logger.error(f"Vapi API error: {response.status}")
-                        return None
+                for endpoint in endpoints:
+                    try:
+                        async with session.post(
+                            endpoint,
+                            headers=headers,
+                            json=data
+                        ) as response:
+                            response_text = await response.text()
+                            logger.info(f"Vapi endpoint {endpoint} status: {response.status}")
+                            logger.info(f"Vapi response: {response_text[:200]}...")
+                            
+                            if response.status == 200:
+                                result = await response.json()
+                                return {
+                                    "audio_url": result.get("audio_url"),
+                                    "duration": result.get("duration"),
+                                    "language": language
+                                }
+                            elif response.status == 404:
+                                logger.info(f"Endpoint {endpoint} not found, trying next...")
+                                continue
+                            else:
+                                logger.error(f"Vapi API error on {endpoint}: {response.status} - {response_text}")
+                                continue
+                    except Exception as e:
+                        logger.error(f"Error with endpoint {endpoint}: {str(e)}")
+                        continue
+                
+                logger.error("All Vapi endpoints failed")
+                return None
                         
         except Exception as e:
             logger.error(f"Error in Vapi synthesis: {str(e)}")

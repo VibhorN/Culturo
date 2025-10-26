@@ -313,13 +313,30 @@ async def transcribe_audio():
             return jsonify({"error": "No audio file provided"}), 400
         
         audio_file = request.files['audio']
-        language = request.form.get('language', 'en-US')
+        language = request.form.get('language', 'auto')
         
         # Read audio data
         audio_data = audio_file.read()
         
+        # Get content type from the uploaded file with better detection
+        content_type = audio_file.content_type or 'audio/webm'
+        
+        # If content type is generic, try to detect from filename
+        if content_type == 'application/octet-stream' or not content_type:
+            filename = audio_file.filename or ''
+            if filename.endswith('.mp4') or filename.endswith('.m4a'):
+                content_type = 'audio/mp4'
+            elif filename.endswith('.wav'):
+                content_type = 'audio/wav'
+            elif filename.endswith('.webm'):
+                content_type = 'audio/webm'
+            else:
+                content_type = 'audio/webm'  # Default fallback
+        
+        logger.info(f"Processing audio: {len(audio_data)} bytes, content_type: {content_type}, language: {language}")
+        
         # Transcribe using Deepgram
-        result = await deepgram.transcribe_audio(audio_data, language)
+        result = await deepgram.transcribe_audio(audio_data, language, content_type)
         
         if result:
             return jsonify(result)
@@ -397,7 +414,13 @@ async def agent_process():
             "language": data.get('language', 'en'),
             "audio_confidence": data.get('audio_confidence', 1.0),
             "cultural_data": data.get('cultural_data', {}),
-            "session_data": data.get('session_data', {})
+            "session_data": data.get('session_data', {}),
+            "input_type": data.get('input_type', 'text'),  # 'voice' or 'text'
+            "voice_context": {
+                "is_voice_input": data.get('input_type') == 'voice',
+                "audio_confidence": data.get('audio_confidence', 1.0),
+                "transcription_quality": data.get('audio_confidence', 1.0)
+            }
         }
         
         # Process through agent workflow

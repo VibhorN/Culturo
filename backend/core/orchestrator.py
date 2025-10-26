@@ -100,12 +100,15 @@ class AgentOrchestrator:
             # Get conversation context for this user
             user_context = self._get_user_context(user_id)
             
-            # Enhance user input with conversation context
+            # Enhance user input with conversation context and voice input info
             enhanced_input = user_input.copy()
             enhanced_input["context"] = {
                 "last_country": user_context["last_country"],
                 "conversation_history": user_context["conversation_history"][-3:],  # Last 3 conversations
-                "user_interests": user_context["user_interests"]
+                "user_interests": user_context["user_interests"],
+                "is_voice_input": user_input.get("input_type") == "voice",
+                "audio_confidence": user_input.get("audio_confidence", 1.0),
+                "voice_context": user_input.get("voice_context", {})
             }
             
             # Step 1: Orchestrator analyzes intent and creates plan
