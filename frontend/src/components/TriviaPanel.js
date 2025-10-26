@@ -271,8 +271,8 @@ function TriviaPanel({ questions, country }) {
                   key={index}
                   onClick={() => handleAnswerSelect(index)}
                   disabled={showFeedback}
-                  $selected={isSelected}
-                  $correct={isCorrect}
+                  $selected={showFeedback && isSelected}
+                  $correct={showFeedback && isCorrect}
                   $showFeedback={showFeedback}
                 >
                   <OptionLetter>

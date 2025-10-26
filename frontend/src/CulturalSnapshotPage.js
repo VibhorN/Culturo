@@ -6,7 +6,15 @@ import { GlobeIcon } from 'lucide-react';
 
 const Container = styled.div`
   min-height: 100vh;
-  background: linear-gradient(135deg, #0a3d62 0%, #1e3c72 25%, #2a5298 50%, #0a3d62 100%);
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(139, 69, 19, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(85, 107, 47, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(101, 67, 33, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 60% 70%, rgba(34, 139, 34, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 10% 30%, rgba(30, 144, 255, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 90% 70%, rgba(65, 105, 225, 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(123, 104, 238, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #1a472a 0%, #2d5016 20%, #4169e1 40%, #2d5016 60%, #1a472a 80%, #4169e1 100%);
   display: flex;
   flex-direction: column;
   align-items: center;

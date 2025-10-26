@@ -41,17 +41,13 @@ class TMDBIntegration:
                         return None
                     videos_data = await videos_resp.json()
                 
-                trailers = [v for v in videos_data.get("results", []) if v.get("site", "").lower() == "youtube" and v.get("type", "").lower() == "trailer"]
+                trailers = [v for v in videos_data.get("results", []) if v.get("site", "").lower() == "youtube" and v.get("type", "").lower() == "trailer"]     
 
                 if trailers:
                     trailer = trailers[0]
-                    # Check if trailer has a valid key
-                    if trailer.get('key'):
-                        youtube_link = f"https://www.youtube.com/watch?v={trailer['key']}"
-                        logger.info(f"🎬 Found trailer: {trailer['name']}")
-                        return youtube_link
-                    else:
-                        logger.warning(f"Trailer found for '{movie_name}' but no key available")
+                    youtube_link = f"https://www.youtube.com/watch?v={trailer['key']}"                                                                          
+                    logger.info(f"🎬 Found trailer: {trailer['name']}")
+                    return youtube_link
 
                 logger.info(f"No YouTube trailers found for '{movie_name}'.")
                 return None

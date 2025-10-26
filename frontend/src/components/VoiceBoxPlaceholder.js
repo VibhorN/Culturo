@@ -79,7 +79,7 @@ const HiddenAudio = styled.audio`
 
 function VoiceBoxPlaceholder({ country = null }) {
   const [isConnected, setIsConnected] = useState(false);
-  const [status, setStatus] = useState(country ? `Discuss ${country}'s culture` : 'Cultural conversation');
+  const [status, setStatus] = useState('Ready');
   const [error, setError] = useState(null);
   const assistantConfigRef = useRef(null);
   const vapiCallRef = useRef(null);
@@ -117,7 +117,7 @@ function VoiceBoxPlaceholder({ country = null }) {
         vapiCallRef.current = null;
       }
       setIsConnected(false);
-      setStatus(country ? `Discuss ${country}'s culture` : 'Cultural conversation');
+      setStatus('Ready');
       setError(null);
     } else {
       // Start call

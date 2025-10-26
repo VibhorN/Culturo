@@ -9,11 +9,11 @@ import './App.css';
 const AppContainer = styled.div`
   min-height: 100vh;
   background: 
-    radial-gradient(circle at 20% 80%, rgba(34, 139, 34, 0.4) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(0, 100, 0, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(70, 130, 180, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 60% 70%, rgba(32, 178, 170, 0.2) 0%, transparent 50%),
-    linear-gradient(135deg, #0a3d62 0%, #1e3c72 25%, #2a5298 50%, #0a3d62 100%);
+    radial-gradient(circle at 20% 80%, rgba(139, 69, 19, 0.4) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(85, 107, 47, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(101, 67, 33, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 60% 70%, rgba(34, 139, 34, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #2d5016 0%, #3e6b1e 25%, #4a7c29 50%, #5c8f35 100%);
   display: flex;
   flex-direction: column;
   align-items: center;

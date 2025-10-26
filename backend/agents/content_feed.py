@@ -139,9 +139,11 @@ class ContentFeedAgent(BaseAgent):
                     except Exception as e:
                         logger.warning(f"Could not get trailer for {title}: {e}")
                 
-                # Fallback to YouTube search if no trailer found
+                # Fallback to YouTube search if no trailer found (keep as search URL since we can't embed it)
                 if not trailer_link:
+                    # Use a placeholder that indicates trailer is on YouTube search
                     trailer_link = f"https://www.youtube.com/results?search_query={title.replace(' ', '+')}+official+trailer"
+                    logger.warning(f"No trailer from TMDB for {title}, using search URL")
                 
                 # Generate description
                 description = await self._call_claude(f"""

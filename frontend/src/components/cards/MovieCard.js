@@ -80,15 +80,30 @@ const PlayIcon = styled(Play)`
 `;
 
 function MovieCard({ data }) {
+  function extractYouTubeId(url) {
+    if (!url) return null;
+    
+    // Handle YouTube video URLs (embeddable)
+    const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
+    const match = url.match(regex);
+    
+    if (match) {
+      console.log('✅ Embeddable URL found:', url, '→ Video ID:', match[1]);
+      return match[1];
+    }
+    
+    // Check if it's a search URL (not embeddable)
+    if (url.includes('youtube.com/results?')) {
+      console.log('❌ Search URL (not embeddable):', url);
+    }
+    
+    return null;
+  }
+
   const trailerId = extractYouTubeId(data.trailer_link);
   const embedUrl = trailerId ? `https://www.youtube.com/embed/${trailerId}` : null;
   
-  function extractYouTubeId(url) {
-    if (!url) return null;
-    const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-  }
+  console.log('Movie:', data.title, '| Trailer URL:', data.trailer_link, '| Can embed:', !!embedUrl);
 
   return (
     <Card>
